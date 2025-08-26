@@ -197,6 +197,7 @@
           </ul>
           <div class="button-group">
             <button id="viewSchemaBtn" class="btn-small btn-secondary">View MDCS</button>
+            <button id="apiSettingsBtn" class="btn-small btn-secondary">API Settings</button>
             <button id="exportLogBtn" class="btn-small btn-secondary" disabled>Export Log</button>
             <button id="clearBtn" class="btn-small btn-danger">Start New</button>
           </div>
@@ -282,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportCsvBtn = document.getElementById('exportCsvBtn');
   const exportJsonBtn = document.getElementById('exportJsonBtn');
   const forceOfflineBtn = document.getElementById('forceOfflineBtn');
+  const apiSettingsBtn = document.getElementById('apiSettingsBtn');
 
   // --- App State ---
   let auditLog = [];
@@ -347,6 +349,12 @@ document.addEventListener('DOMContentLoaded', () => {
     messageBox.textContent = msg;
     messageBox.classList.remove('hidden');
     logEvent(`Message: ${msg}`, kind.toUpperCase());
+  };
+  const saveSetting = (key, value) => {
+    try { localStorage.setItem(key, value || ''); } catch (_) {}
+  };
+  const getSetting = (key) => {
+    try { return localStorage.getItem(key) || ''; } catch (_) { return ''; }
   };
   const setLoading = (show, text = 'Analyzing...', progress = 0) => {
     loadingIndicator.classList.toggle('hidden', !show);
@@ -872,11 +880,17 @@ ${text}
     // Check for API keys before making the call
     if (mode === 'gemini' && !geminiApiKeyInput.value.trim()) {
         showMessage('Please enter your Gemini API key to use this mode.', 'error');
+        endpointSettings.classList.remove('hidden');
+        geminiApiKeyLabel.classList.remove('hidden');
+        setTimeout(() => geminiApiKeyInput.focus(), 0);
         setLoading(false);
         return;
     }
     if (mode === 'openai' && !openaiApiKeyInput.value.trim()) {
         showMessage('Please enter your OpenAI API key to use this mode.', 'error');
+        endpointSettings.classList.remove('hidden');
+        openaiApiKeyLabel.classList.remove('hidden');
+        setTimeout(() => openaiApiKeyInput.focus(), 0);
         setLoading(false);
         return;
     }
@@ -947,9 +961,36 @@ ${text}
     logEvent(`Switched mode to: ${mode}`);
     // Clear the force offline button
     forceOfflineBtn.classList.add('hidden');
+    if (mode === 'gemini' && !geminiApiKeyInput.value.trim()) {
+      setTimeout(() => geminiApiKeyInput.focus(), 0);
+    }
+    if (mode === 'openai' && !openaiApiKeyInput.value.trim()) {
+      setTimeout(() => openaiApiKeyInput.focus(), 0);
+    }
   });
   openFileBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+  // API Settings button
+  if (apiSettingsBtn) {
+    apiSettingsBtn.addEventListener('click', () => {
+      endpointSettings.classList.remove('hidden');
+      modeSelect.value = 'gemini';
+      modeSelect.dispatchEvent(new Event('change'));
+      setTimeout(() => geminiApiKeyInput.focus(), 0);
+      logEvent('API Settings opened (switched to Gemini).');
+    });
+  }
+
+  // Persist API keys and endpoint
+  if (geminiApiKeyInput) {
+    geminiApiKeyInput.addEventListener('input', () => saveSetting('geminiApiKey', geminiApiKeyInput.value));
+  }
+  if (openaiApiKeyInput) {
+    openaiApiKeyInput.addEventListener('input', () => saveSetting('openaiApiKey', openaiApiKeyInput.value));
+  }
+  if (endpointInput) {
+    endpointInput.addEventListener('input', () => saveSetting('customEndpoint', endpointInput.value));
+  }
 
   sampleBtn.addEventListener('click', () => {
     logEvent('Loading sample diagnostic text.');
@@ -1060,6 +1101,10 @@ Resistance should be 1.1 - 1.35k Ω.
 
   // Init
   const init = () => {
+    // Load saved API settings
+    geminiApiKeyInput.value = getSetting('geminiApiKey');
+    openaiApiKeyInput.value = getSetting('openaiApiKey');
+    endpointInput.value = getSetting('customEndpoint');
     schemaContent.textContent = JSON.stringify(MDCS_SCHEMA, null, 2);
     const schemaString = JSON.stringify(MDCS_SCHEMA);
     let hash = 0;
