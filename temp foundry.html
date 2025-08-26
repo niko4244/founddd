@@ -564,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const end = (i + 1 < codeMatches.length) ? codeMatches[i + 1].index : text.length;
       const block = text.slice(start, end);
       
-      const code = (curr[1] || '').replace(/\s+/g, '').toUpperCase();
+      const code = (curr[0] || curr[1] || '').replace(/\s+/g, '').toUpperCase();
       if (!code) continue;
 
       let desc = '';
@@ -860,7 +860,7 @@ ${text}
     currentFileText = text;
     const mode = modeSelect.value;
     logEvent(`Processing text using mode: ${mode}`);
-    if (['offline', 'ocr'].includes(mode) || (mode === 'free_tier' && !currentFileText)) {
+    if (['offline', 'ocr', 'free_tier'].includes(mode)) {
       setLoading(true, "Running offline parser…");
       await new Promise(r => setTimeout(r, 30));
       const offlineData = parseOffline(currentFileText);
