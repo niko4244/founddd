@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Diagnostic Data Extractor — Foundry Edition</title>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js";
+  </script>
+
+  <!-- Tesseract.js -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+  <style>
+    :root {
+      --primary-color: #10b981;
+      --dark-bg: #111827;
+      --medium-bg: #1f2937;
+      --light-bg: #374151;
+      --text-light: #f3f4f6;
+      --text-medium: #9ca3af;
+      --text-dark: #6b7280;
+      --border-color: #374151;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:linear-gradient(135deg,var(--medium-bg) 0%,var(--dark-bg) 100%);color:var(--text-light);min-height:100vh;line-height:1.6}
+    .container{max-width:1400px;margin:0 auto;padding:0 1rem}
+    header{border-bottom:1px solid rgba(107,114,128,.3);padding:2rem 0}
+    .header-content{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem}
+    h1{font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:.5rem}
+    .foundry-badge{color:var(--primary-color)}
+    .subtitle{color:var(--text-medium);font-size:.875rem}
+    .version-info{font-size:.75rem;color:var(--text-dark);text-align:right;font-family:monospace}
+    main{padding:2rem 0}
+    .control-panel{background:linear-gradient(180deg,rgba(31,41,55,.75),rgba(17,24,39,.75));border:1px solid var(--border-color);border-radius:1rem;padding:2rem;margin-bottom:2rem}
+    .drop-zone{border:2px dashed #4b5563;border-radius:1rem;transition:background-color .2s,border-color .2s}
+    .drop-zone-over{background-color:rgba(16,185,129,.1);border-color:var(--primary-color)}
+    .panel-grid{display:grid;grid-template-columns:1fr auto;gap:2rem;align-items:start}
+    .control-section h2{font-size:1.25rem;font-weight:600;color:#fff;margin-bottom:.5rem}
+    .control-section p{color:var(--text-medium);font-size:.875rem;margin-bottom:1.5rem}
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem}
+    label{display:block}
+    label span{display:block;font-size:.875rem;color:#d1d5db;margin-bottom:.25rem}
+    select,input[type="password"],input[type="url"]{width:100%;background:var(--dark-bg);border:1px solid var(--border-color);border-radius:.5rem;padding:.5rem .75rem;font-size:.875rem;color:var(--text-light);font-family:monospace;transition:border-color .2s,box-shadow .2s}
+    select:focus,input:focus{outline:none;border-color:var(--primary-color);box-shadow:0 0 0 2px rgba(16,185,129,.2)}
+    select:disabled,input:disabled{background:var(--light-bg);cursor:not-allowed;opacity:.6}
+    .button-group{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+    button{padding:.5rem 1rem;border-radius:.5rem;border:none;font-weight:600;font-size:.875rem;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:.5rem}
+    button:disabled{cursor:not-allowed;opacity:.5}
+    .btn-primary{background:#059669;color:#fff}
+    .btn-primary:hover:not(:disabled){background:#047857}
+    .btn-secondary{background:var(--light-bg);color:#fff}
+    .btn-secondary:hover:not(:disabled){background:#4b5563}
+    .btn-small{padding:.375rem .75rem;font-size:.75rem}
+    .btn-danger{background:#dc2626;color:#fff}
+    .btn-danger:hover:not(:disabled){background:#b91c1c}
+    .kbd{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-bottom-width:3px;border-radius:.25rem;padding:.125rem .375rem;font-size:.75rem;font-weight:600}
+    .transparency-panel{width:300px}
+    .transparency-panel h3{font-size:.875rem;font-weight:600;color:#e5e7eb;margin-bottom:.5rem}
+    .transparency-panel ul{list-style:none;font-size:.75rem;color:var(--text-medium);margin-bottom:1rem}
+    .transparency-panel li{margin-bottom:.5rem}
+    .message-box{padding:1rem;border-radius:.5rem;margin:1rem 0}
+    .message-info{background:rgba(59,130,246,.1);border:1px solid #3b82f6;color:#93c5fd}
+    .message-success{background:rgba(16,185,129,.1);border:1px solid var(--primary-color);color:#6ee7b7}
+    .message-error{background:rgba(239,68,68,.1);border:1px solid #ef4444;color:#fca5a5}
+    .message-warn{background:rgba(245,158,11,.1);border:1px solid #f59e0b;color:#fcd34d}
+    .loading-container{text-align:center;padding:2rem 0}
+    .spinner{width:3rem;height:3rem;border:4px solid var(--light-bg);border-top:4px solid var(--primary-color);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 1rem}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    .progress-bar{width:100%;max-width:24rem;margin:0 auto .5rem;height:.5rem;background:var(--light-bg);border-radius:.25rem;overflow:hidden}
+    .progress-fill{height:100%;background:var(--primary-color);transition:width .3s ease}
+    .results-section{margin-top:2rem}
+    .results-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem}
+    .results-title{font-size:1.875rem;font-weight:700;color:#fff}
+    .results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:1.25rem}
+    .diag-card{background:rgba(31,41,55,.5);border:1px solid var(--border-color);border-radius:.75rem;padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;transition:all .2s}
+    .diag-card:hover{border-color:var(--primary-color);box-shadow:0 0 15px rgba(16,185,129,.1)}
+    .card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;border-bottom:1px solid var(--border-color);padding-bottom:.75rem}
+    .card-code{font-family:monospace;font-size:1.25rem;font-weight:700;color:#fff}
+    .severity-badge{font-size:.7rem;font-weight:600;padding:.2rem .5rem;border-radius:99px;text-transform:uppercase;flex-shrink:0}
+    .severity-Low{background-color:#059669;color:#fff}
+    .severity-Medium{background-color:#f59e0b;color:#111}
+    .severity-High{background-color:#ef4444;color:#fff}
+    .severity-Critical{background-color:#dc2626;color:#fff;border:1px solid #fff}
+    .card-source{font-size:.75rem;color:var(--text-medium);font-family:monospace}
+    .card-description{color:var(--text-light);font-size:.9rem}
+    .card-action{font-style:italic;color:var(--text-medium);background:rgba(0,0,0,.2);padding:.75rem;border-radius:.5rem;border-left:3px solid var(--primary-color);font-size:.85rem}
+    .card-section-title{font-weight:600;color:#e5e7eb;margin-bottom:.5rem;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+    .test-list{list-style:none;padding:0;margin:0;font-size:.8rem;display:flex;flex-direction:column;gap:.75rem}
+    .test-list li{border-left:2px solid #4b5563;padding-left:.75rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+    .copy-btn{background:#4b5563;color:#d1d5db;border:none;padding:.25rem .5rem;font-size:.7rem;border-radius:.25rem;cursor:pointer;opacity:.7;flex-shrink:0}
+    .copy-btn:hover{opacity:1;background:var(--primary-color);color:#fff}
+    .card-footer{margin-top:auto;padding-top:.75rem;border-top:1px solid var(--border-color)}
+    .audit-log{margin-top:3rem}
+    .audit-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+    .audit-title{font-size:1.25rem;font-weight:600;color:#fff}
+    .log-container{background:rgba(0,0,0,.4);border:1px solid var(--border-color);border-radius:.75rem;padding:1rem}
+    .log-content{font-family:monospace;font-size:.75rem;white-space:pre-wrap;max-height:18rem;overflow-y:auto;line-height:1.5;color:var(--text-medium)}
+    .schema-section{margin-top:2rem}
+    .schema-details{background:rgba(17,24,39,.6);border:1px solid var(--border-color);border-radius:.75rem;padding:1rem}
+    .schema-summary{cursor:pointer;font-weight:600;color:#fff;padding:.5rem}
+    .schema-content{font-family:monospace;font-size:.75rem;white-space:pre-wrap;margin-top:.75rem;color:#d1d5db}
+    .hidden{display:none}
+    #fileInput{display:none}
+    @media (max-width:992px){
+      .panel-grid{grid-template-columns:1fr}
+      .transparency-panel{width:100%}
+      .form-grid{grid-template-columns:1fr}
+      .results-header{flex-direction:column;align-items:stretch}
+      h1{font-size:2rem}
+      .header-content{flex-direction:column}
+      .version-info{text-align:left}
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <div class="header-content">
+      <div>
+        <h1>Diagnostic Data Extractor <span class="foundry-badge">• Foundry Edition</span></h1>
+        <p class="subtitle">Serviceable, offline-first, AI-optional analysis for manuals (PDF, image, or text).</p>
+      </div>
+      <div class="version-info">
+        <div>Build: v2.8.3-foundry</div>
+        <div id="checksumLine">MDCS Hash: —</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+
+    <!-- Control Panel -->
+    <section id="dropZone" class="control-panel drop-zone">
+      <div class="panel-grid">
+        <div class="control-section">
+          <h2>Power & Control</h2>
+          <p>Upload a file, use a sample, or drag & drop. AI modes use your key; offline works locally.</p>
+
+          <div class="form-grid">
+            <label>
+              <span>Mode</span>
+              <select id="modeSelect">
+                <option value="free_tier" selected>Free Tier (Offline Fallback)</option>
+                <option value="gemini">Gemini API (JSON schema)</option>
+                <option value="openai">OpenAI API (JSON)</option>
+                <option value="offline">Offline (Manual Parse)</option>
+                <option value="ocr">Offline + OCR for images (Tesseract)</option>
+                <option value="custom">Custom HTTP Endpoint</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Safety Mode</span>
+              <select id="safetySelect">
+                <option value="conservative">Conservative (fail safe)</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="aggressive">Aggressive (extract more)</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="endpointSettings" class="form-grid hidden">
+            <label id="customEndpointLabel" class="hidden">
+              <span>Custom Endpoint URL</span>
+              <input id="endpoint" type="url" placeholder="https://your-custom-api.com/extract"/>
+            </label>
+            <label id="geminiApiKeyLabel" class="hidden">
+              <span>Gemini API Key</span>
+              <input id="geminiApiKey" type="password" placeholder="Enter your Gemini API key"/>
+            </label>
+            <label id="openaiApiKeyLabel" class="hidden">
+              <span>OpenAI API Key</span>
+              <input id="openaiApiKey" type="password" placeholder="Enter your OpenAI API key"/>
+            </label>
+          </div>
+
+          <div class="button-group">
+            <button id="openFileBtn" class="btn-primary">Upload Diagnostic File <span class="kbd">U</span></button>
+            <button id="sampleBtn" class="btn-secondary">Use Sample File</button>
+            <button id="forceOfflineBtn" class="btn-secondary btn-small hidden">Run Offline Parser</button>
+            <input id="fileInput" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt"/>
+          </div>
+        </div>
+
+        <div class="transparency-panel">
+          <h3>Transparency & Diagnostics</h3>
+          <ul>
+            <li>• No hidden uploads. Remote calls only in AI modes you select.</li>
+            <li>• Full audit trail below. Exportable as JSON.</li>
+            <li>• “MDCS” schema is the single source of truth.</li>
+          </ul>
+          <div class="button-group">
+            <button id="viewSchemaBtn" class="btn-small btn-secondary">View MDCS</button>
+            <button id="exportLogBtn" class="btn-small btn-secondary" disabled>Export Log</button>
+            <button id="clearBtn" class="btn-small btn-danger">Start New</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Messages -->
+    <div id="messageBox" class="message-box hidden"></div>
+
+    <!-- Loading -->
+    <div id="loadingIndicator" class="loading-container hidden">
+      <div class="spinner"></div>
+      <p id="loadingText">Analyzing…</p>
+      <div class="progress-bar">
+        <div id="progressBar" class="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <section id="resultsSection" class="results-section hidden">
+      <div class="results-header">
+        <h2 class="results-title">Extracted Diagnostic Data</h2>
+        <div class="button-group">
+          <button id="exportCsvBtn" class="btn-secondary">Export as CSV</button>
+          <button id="exportJsonBtn" class="btn-secondary">Export as JSON</button>
+        </div>
+      </div>
+      <div id="resultsGrid" class="results-grid"></div>
+    </section>
+
+    <!-- Audit Log -->
+    <section id="auditLogSection" class="audit-log hidden">
+      <div class="audit-header"><h2 class="audit-title">Audit Log</h2></div>
+      <div class="log-container">
+        <div id="logContent" class="log-content"></div>
+      </div>
+    </section>
+
+    <!-- Schema -->
+    <section id="schemaSection" class="schema-section hidden">
+      <div class="schema-details">
+        <details>
+          <summary class="schema-summary">Maintenance Diagnostic Code Schema (MDCS)</summary>
+          <pre id="schemaContent" class="schema-content"></pre>
+        </details>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // --- DOM Elements ---
+  const modeSelect = document.getElementById('modeSelect');
+  const safetySelect = document.getElementById('safetySelect');
+  const endpointSettings = document.getElementById('endpointSettings');
+  const customEndpointLabel = document.getElementById('customEndpointLabel');
+  const geminiApiKeyLabel = document.getElementById('geminiApiKeyLabel');
+  const openaiApiKeyLabel = document.getElementById('openaiApiKeyLabel');
+  const geminiApiKeyInput = document.getElementById('geminiApiKey');
+  const openaiApiKeyInput = document.getElementById('openaiApiKey');
+  const endpointInput = document.getElementById('endpoint');
+  const openFileBtn = document.getElementById('openFileBtn');
+  const fileInput = document.getElementById('fileInput');
+  const sampleBtn = document.getElementById('sampleBtn');
+  const viewSchemaBtn = document.getElementById('viewSchemaBtn');
+  const exportLogBtn = document.getElementById('exportLogBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const messageBox = document.getElementById('messageBox');
+  const loadingIndicator = document.getElementById('loadingIndicator');
+  const loadingText = document.getElementById('loadingText');
+  const progressBar = document.getElementById('progressBar');
+  const resultsSection = document.getElementById('resultsSection');
+  const resultsGrid = document.getElementById('resultsGrid');
+  const auditLogSection = document.getElementById('auditLogSection');
+  const logContent = document.getElementById('logContent');
+  const schemaSection = document.getElementById('schemaSection');
+  const schemaContent = document.getElementById('schemaContent');
+  const checksumLine = document.getElementById('checksumLine');
+  const dropZone = document.getElementById('dropZone');
+  const exportCsvBtn = document.getElementById('exportCsvBtn');
+  const exportJsonBtn = document.getElementById('exportJsonBtn');
+  const forceOfflineBtn = document.getElementById('forceOfflineBtn');
+
+  // --- App State ---
+  let auditLog = [];
+  let extractedData = [];
+  let currentFileText = '';
+
+  // --- MDCS Schema ---
+  const MDCS_SCHEMA = {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        description: { type: "string" },
+        severity: { type: "string", enum: ["Low", "Medium", "High", "Critical"] },
+        source: { type: "string" },
+        recommendedAction: { type: "string" },
+        pinTests: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              component: { type: "string" },
+              pin: { type: "string" },
+              condition: { type: "string" },
+              expectedValue: { type: "string" }
+            },
+            required: ["component", "pin", "condition", "expectedValue"]
+          }
+        },
+        componentSpecs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              component: { type: "string" },
+              testName: { type: "string" },
+              condition: { type: "string" },
+              expectedValue: { type: "string" }
+            },
+            required: ["component", "testName", "condition", "expectedValue"]
+          }
+        }
+      },
+      required: ["code", "description", "severity"]
+    }
+  };
+
+  // --- Utils ---
+  const logEvent = (message, type = 'INFO') => {
+    const ts = new Date().toISOString();
+    const entry = { timestamp: ts, type, message };
+    auditLog.push(entry);
+    const line = document.createElement('div');
+    line.textContent = `[${ts}] [${type}] ${message}`;
+    logContent.appendChild(line);
+    logContent.scrollTop = logContent.scrollHeight;
+    auditLogSection.classList.remove('hidden');
+    exportLogBtn.disabled = false;
+  };
+  const showMessage = (msg, kind = 'info') => {
+    messageBox.className = `message-box message-${kind}`;
+    messageBox.textContent = msg;
+    messageBox.classList.remove('hidden');
+    logEvent(`Message: ${msg}`, kind.toUpperCase());
+  };
+  const setLoading = (show, text = 'Analyzing...', progress = 0) => {
+    loadingIndicator.classList.toggle('hidden', !show);
+    if (show) {
+      resultsSection.classList.add('hidden');
+      messageBox.classList.add('hidden');
+    }
+    loadingText.textContent = text;
+    progressBar.style.width = `${progress}%`;
+  };
+  const resetUI = () => {
+    logEvent('UI reset initiated.');
+    fileInput.value = '';
+    resultsGrid.innerHTML = '';
+    resultsSection.classList.add('hidden');
+    messageBox.classList.add('hidden');
+    messageBox.textContent = '';
+    loadingIndicator.classList.add('hidden');
+    auditLog = [];
+    logContent.innerHTML = '';
+    auditLogSection.classList.add('hidden');
+    exportLogBtn.disabled = true;
+    extractedData = [];
+    currentFileText = '';
+    forceOfflineBtn.classList.add('hidden');
+    logEvent('UI reset complete.');
+  };
+  const copyToClipboard = async (text, element) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      if (element) {
+        const original = element.innerHTML;
+        element.textContent = 'Copied!';
+        setTimeout(() => { element.innerHTML = original; }, 1200);
+      }
+      logEvent('Copied to clipboard.', 'DEBUG');
+    } catch (e) {
+      logEvent('Copy to clipboard failed: ' + e.message, 'ERROR');
+      showMessage('Could not copy to clipboard.', 'error');
+    }
+  };
+  const downloadFile = (content, fileName, mimeType) => {
+    const a = document.createElement('a');
+    const blob = new Blob([content], { type: mimeType });
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    logEvent(`Exported ${fileName}`);
+  };
+  // More robust JSON parsing
+  const tryParseJSONLoose = (text) => {
+    const stripped = text.replace(/```json|```/gi, '').trim();
+    try {
+      logEvent('Attempting direct JSON parse.', 'DEBUG');
+      return JSON.parse(stripped);
+    } catch(e) {
+      logEvent(`Direct JSON parse failed: ${e.message}`, 'WARN');
+    }
+    const firstBracket = stripped.indexOf('[');
+    const lastBracket = stripped.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+      try {
+        logEvent('Attempting bracket-delimited JSON parse.', 'DEBUG');
+        return JSON.parse(stripped.substring(firstBracket, lastBracket + 1));
+      } catch(e) {
+        logEvent(`Bracket-delimited JSON parse failed: ${e.message}`, 'WARN');
+      }
+    }
+    const firstBrace = stripped.indexOf('{');
+    const lastBrace = stripped.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        logEvent('Attempting brace-delimited JSON parse.', 'DEBUG');
+        return JSON.parse(stripped.substring(firstBrace, lastBrace + 1));
+      } catch(e) {
+        logEvent(`Brace-delimited JSON parse failed: ${e.message}`, 'WARN');
+      }
+    }
+    throw new Error('Unable to parse JSON from model response.');
+  };
+  const normalizeToArray = (data) => {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.data)) return data.data;
+    if (data && Array.isArray(data.mdcs)) return data.mdcs;
+    if (data && Array.isArray(data.items)) return data.items;
+    return [];
+  };
+
+  // --- Rendering ---
+  const renderResults = (data) => {
+    if (!data || !data.length) {
+      showMessage('No diagnostic data found.', 'warn');
+      return;
+    }
+    extractedData = data;
+    resultsGrid.innerHTML = '';
+
+    const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zM-1 7a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1zM8 1.5A1.5 1.5 0 0 0 6.5 0h-3A1.5 1.5 0 0 0 2 1.5v1A1.5 1.5 0 0 0 3.5 4h9A1.5 1.5 0 0 0 14 2.5v-1A1.5 1.5 0 0 0 12.5 0h-3A1.5 1.5 0 0 0 8 1.5v1z"/></svg>`;
+
+    const generateTestListHTML = (tests, isPinTest) => {
+      if (!tests || !tests.length) return '<p style="font-size:.8rem;color:var(--text-medium);">N/A</p>';
+      return `<ul class="test-list">${tests.map(test => {
+        const textLine = isPinTest
+          ? `${test.component} - ${test.pin}: ${test.condition} -> ${test.expectedValue}`
+          : `${test.component} - ${test.testName}: ${test.condition} -> ${test.expectedValue}`;
+        const displayHTML = isPinTest
+          ? `<strong>${test.component} - ${test.pin}:</strong><br/>${test.condition} &rarr; ${test.expectedValue}`
+          : `<strong>${test.testName}:</strong><br/>${test.condition} &rarr; ${test.expectedValue}`;
+        return `<li><div>${displayHTML}</div><button type="button" class="copy-btn" title="Copy Test" data-value="${textLine}">${copyIcon}</button></li>`;
+      }).join('')}</ul>`;
+    };
+
+    data.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'diag-card';
+      const severity = item.severity || 'Medium';
+      card.innerHTML = `
+        <div class="card-header">
+          <div>
+            <div class="card-code">${item.code || 'N/A'}</div>
+            <div class="card-source">Source: ${item.source || 'N/A'}</div>
+          </div>
+          <div class="severity-badge severity-${severity}">${severity}</div>
+        </div>
+        <div><p class="card-description">${item.description || 'No description available.'}</p></div>
+        ${item.recommendedAction ? `<div class="card-action">${item.recommendedAction}</div>` : ''}
+        <div>
+          <h3 class="card-section-title">Pin Tests</h3>
+          ${generateTestListHTML(item.pinTests, true)}
+        </div>
+        <div>
+          <h3 class="card-section-title">Component Specs</h3>
+          ${generateTestListHTML(item.componentSpecs, false)}
+        </div>
+        <div class="card-footer">
+          <button class="btn-secondary btn-small copy-report-btn">Copy Report</button>
+        </div>`;
+      resultsGrid.appendChild(card);
+    });
+
+    resultsSection.classList.remove('hidden');
+    showMessage(`Processed ${data.length} item(s).`, 'success');
+  };
+
+  // --- PDF / Image Extraction ---
+  const extractTextFromPdf = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const typed = new Uint8Array(e.target.result);
+        const pdf = await pdfjsLib.getDocument(typed).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          setLoading(true, `Reading PDF page ${i} of ${pdf.numPages}`, (i / pdf.numPages) * 100);
+          const page = await pdf.getPage(i);
+          const txtContent = await page.getTextContent();
+          fullText += txtContent.items.map(it => it.str).join(' ') + '\n';
+        }
+        resolve(fullText);
+      } catch (err) { reject(new Error(`PDF parsing failed: ${err.message}`)); }
+    };
+    reader.onerror = () => reject(new Error('Failed to read the file.'));
+    reader.readAsArrayBuffer(file);
+  });
+  const extractTextFromImage = async (file) => {
+    const { createWorker } = Tesseract;
+    const worker = await createWorker({ logger: m => {
+      if (m.status === 'recognizing text') {
+        setLoading(true, `Performing OCR: ${Math.round(m.progress * 100)}%`, m.progress * 100);
+      } else {
+        logEvent(`Tesseract: ${m.status}`, 'DEBUG');
+      }
+    }});
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    const { data: { text }} = await worker.recognize(file);
+    await worker.terminate();
+    return text;
+  };
+
+  // --- Robust Offline Parser ---
+  const parseOffline = (raw) => {
+    logEvent('Running offline parser (codes + tests + component-only entries).');
+
+    const text = raw
+      .replace(/\r/g, '\n')
+      .replace(/[–—]/g, '-')
+      .replace(/\u00A0/g, ' ')
+      .replace(/[“”]/g, '"')
+      .replace(/[’]/g, "'");
+
+    const codeRegex = /\b(F\s*\d+\s*E\s*\d+|F\d+E\d+|[PBUC]\d{4}(?:-\d{2})?)\b/gi;
+    const testHeaderRegex = /TEST\s*#\s*(\d+)\s*:\s*([^\n]+)\n?/ig;
+
+    // 1) Parse Fault/Error code blocks first
+    const codeBlocks = [];
+    const codeMatches = [...text.matchAll(codeRegex)];
+    for (let i = 0; i < codeMatches.length; i++) {
+      const curr = codeMatches[i];
+      const start = curr.index;
+      const end = (i + 1 < codeMatches.length) ? codeMatches[i + 1].index : text.length;
+      const block = text.slice(start, end);
+      
+      const code = (curr[1] || '').replace(/\s+/g, '').toUpperCase();
+      if (!code) continue;
+
+      let desc = '';
+      const descMatch = block.match(/^([^\n]+)/);
+      if (descMatch) {
+          const codePart = code.replace(/\s+/g, '').toUpperCase();
+          const rawDesc = descMatch[1].replace(new RegExp(`^\\s*${codePart}\\s*`, 'i'), '').trim();
+          desc = rawDesc.replace(/[\u2022\u2023\u25E6\u2043]/g, '').trim(); // Remove bullet points
+      }
+      
+      const testRefs = [...block.matchAll(/See\s+TEST\s*#\s*(\d+)/gi)].map(m => parseInt(m[1], 10));
+      
+      const sourceMatch = block.match(/\b(ACU|ECM|PCM|BCM|HMI|Accelerometer|Door Lock|Pump|Heater|Thermistor)\b/i);
+      const source = sourceMatch ? sourceMatch[1].toString() : '';
+
+      let recommendedAction = '';
+      const actMatch = block.match(/(Action:|Recommended Procedure:?)\s*([^\n]+)/i);
+      if (actMatch) recommendedAction = actMatch[2].trim();
+      if (!recommendedAction && testRefs.length) {
+        recommendedAction = `Run TEST #${testRefs.join(', ')} per Component Testing.`;
+      }
+
+      codeBlocks.push({
+        code,
+        description: desc || 'Fault per service chart.',
+        severity: 'Medium',
+        source,
+        recommendedAction,
+        testRefs
+      });
+    }
+
+    // 2) Parse Component Testing blocks
+    const tests = {};
+    const testHeaders = [...text.matchAll(testHeaderRegex)];
+    for (let i = 0; i < testHeaders.length; i++) {
+      const m = testHeaders[i];
+      const testNum = parseInt(m[1], 10);
+      const title = m[2].trim();
+      const start = m.index + m[0].length;
+      const end = (i + 1 < testHeaders.length) ? testHeaders[i + 1].index : text.length;
+      const block = text.slice(start, end);
+
+      const pinTests = [];
+      const componentSpecs = [];
+      const componentName = title.split(/\s*:\s*/)[0].replace(/TEST\s*#\d+\s*$/i, '').trim();
+
+      const addPin = (component, pin, condition, expected) => {
+        if (!component || !pin || !expected) return;
+        pinTests.push({
+          component: (component || componentName).trim(),
+          pin: pin.trim().replace(/\s+/g, ' '),
+          condition: (condition || 'Per test procedure').trim(),
+          expectedValue: expected.trim()
+        });
+      };
+      const addSpec = (component, testName, condition, expected) => {
+        if (!component || !testName || !expected) return;
+        componentSpecs.push({
+          component: component.trim(),
+          testName: testName.trim(),
+          condition: (condition || 'Per spec').trim(),
+          expectedValue: expected.trim()
+        });
+      };
+
+      // Table-like rows: "Drain Pump J11-1 to J11-2 18.5 - 21.5 Ω"
+      const tableRowRegex = /([A-Za-z][A-Za-z0-9\/\-\s]+?)\s+(J\d+-\d+\s*(?:to|&|and|-)\s*J\d+-\d+)\s+([0-9.]+\s*(?:-\s*[0-9.]+\s*)?(?:k)?\s*Ω)/gi;
+      let tr;
+      while ((tr = tableRowRegex.exec(block)) !== null) {
+        addPin(tr[1], tr[2], 'Room temperature check', tr[3].replace(/\s+/g, ' ').trim());
+      }
+      
+      // Pinout block + default resistance/voltage
+      const pinoutBlockRegex = /(Pinout|Connector|Terminals)[\s\S]*?(?=\n[A-Z ]{4,}[:]|TEST\s*#|\Z)/i;
+      const pinoutBlockMatch = block.match(pinoutBlockRegex);
+      if (pinoutBlockMatch) {
+        const pinLineRegex = /^\s*([A-Za-z][A-Za-z0-9\/\-\s\(\)#]+?)\s+(J\d+),?\s*pins?\s*([0-9A-Za-z\s&\-]+)\s*$/gmi;
+        let ln;
+        const pinoutMap = [];
+        while ((ln = pinLineRegex.exec(pinoutBlockMatch[0])) !== null) {
+          pinoutMap.push({ comp: ln[1].trim(), conn: ln[2].trim(), pinsOnly: ln[3].trim().replace(/\s+/g, ' ') });
+        }
+        
+        const resMatch = block.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*Ω)/i);
+        if(resMatch) {
+            const defaultExpected = resMatch[1].replace(/\s+/g, ' ').trim();
+            pinoutMap.forEach(p => addPin(p.comp, `${p.conn} pins ${p.pinsOnly}`, 'Coil resistance (connector removed)', defaultExpected));
+        }
+        const voltMatch = block.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+V(?:DC|AC)?)/i);
+        if(voltMatch) {
+            const defaultExpected = voltMatch[1].replace(/\s+/g, ' ').trim();
+            pinoutMap.forEach(p => addPin(p.comp, `${p.conn} pins ${p.pinsOnly}`, 'Voltage check', defaultExpected));
+        }
+      }
+
+      // Measured resistance/continuity across pins
+      const measureResRegex = /measure\s+the\s+(?:resistance|continuity)\s+across\s+pins?\s*([0-9A-Za-z\-\s&andto]+)\s+(?:of\s+)?(?:connector\s+)?(J\d+)/gi;
+      let mr;
+      while ((mr = measureResRegex.exec(block)) !== null) {
+        const pinsHuman = mr[1].replace(/\s+and\s+/i, ' to ').replace(/\s+/g, ' ').trim();
+        const conn = mr[2];
+        const near = block.slice(mr.index, Math.min(block.length, mr.index + 300));
+        const ohm = (near.match(/([0-9.]+\s*-\s*[0-9.]+|[0-9.]+)\s*(k)?\s*Ω/i) || [,''])[0];
+        const resOrCont = near.match(/resistance/i) ? 'Resistance' : 'Continuity';
+        addPin(componentName, `${conn} pins ${pinsHuman}`, `${resOrCont} check`, ohm || 'See step range');
+      }
+      
+      // Voltage check patterns (more generic)
+      const voltRegex = /(?:you\s+should\s+measure|measure)\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?\s+at\s+(?:the\s+)?(J\d+),?\s*pins?\s*([0-9\s&and\-]+)/gi;
+      let vr;
+      while ((vr = voltRegex.exec(block)) !== null) {
+          const range = vr[1].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim() + ' V';
+          const conn = vr[2];
+          const pinsOnly = vr[3].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
+          addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', range);
+      }
+
+      // Component specs sentences and temp tables
+      const specResRegex = /Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*Ω)/ig;
+      let sr;
+      while ((sr = specResRegex.exec(block)) !== null) {
+        addSpec(componentName, 'Resistance Spec', 'Room temperature', sr[1].replace(/\s+/g, ' ').trim());
+      }
+      const tempTableRegex = /At\s+([0-9]+)\s*°C[^\.]*?\s*([0-9.]+)\s*(k)?\s*Ω/ig;
+      let tt;
+      while ((tt = tempTableRegex.exec(block)) !== null) {
+        const temp = tt[1] + '°C';
+        const val = tt[2] + (tt[3] ? 'k' : '') + ' Ω';
+        addSpec(componentName, 'Temperature-Resistance', `At ${temp}`, val);
+      }
+
+      // Final sanity check for empty tests
+      if (pinTests.length > 0 || componentSpecs.length > 0) {
+        tests[testNum] = { title, pinTests, componentSpecs };
+      }
+    }
+
+    // 3) Build per-code objects (join to referenced TESTs)
+    const results = [];
+    const uniqCodes = new Set();
+    const referencedTests = new Set();
+
+    codeBlocks.forEach(c => {
+      const key = c.code;
+      if (uniqCodes.has(key)) return;
+      uniqCodes.add(key);
+
+      const pinTests = [];
+      const componentSpecs = [];
+      (c.testRefs || []).forEach(num => {
+        if (tests[num]) {
+          referencedTests.add(num);
+          pinTests.push(...tests[num].pinTests);
+          componentSpecs.push(...tests[num].componentSpecs);
+        }
+      });
+
+      results.push({
+        code: c.code,
+        description: c.description,
+        severity: c.severity,
+        source: c.source || 'Service Chart',
+        recommendedAction: c.recommendedAction || '',
+        pinTests,
+        componentSpecs
+      });
+    });
+
+    // 4) NEW: Add component-only entries for unreferenced TEST blocks
+    Object.entries(tests).forEach(([numStr, t]) => {
+      const num = parseInt(numStr, 10);
+      if (referencedTests.has(num)) return; // already linked to a code
+      // synthetic component entry
+      results.push({
+        code: `COMP-${num}: ${t.title}`,
+        description: `${t.title} baseline checks (no active fault reference).`,
+        severity: 'Low',
+        source: 'Component Testing',
+        recommendedAction: 'Use for baseline verification or preventive checks.',
+        pinTests: t.pinTests,
+        componentSpecs: t.componentSpecs
+      });
+    });
+
+    logEvent(`Offline parser produced ${results.length} item(s) including component-only entries.`);
+    return results;
+  };
+
+  // --- AI Calls (Gemini & OpenAI) ---
+  const buildAnalysisPrompt = (text, safetyMode) => {
+    const strictness = {
+      aggressive: 'Be liberal when linking procedures/specs to codes if context strongly implies the relation.',
+      conservative: 'Be extremely strict. Only include items explicitly and unambiguously linked. Do not infer.',
+      balanced: 'Prioritize accuracy but allow reasonable context to link items.'
+    };
+    return `You are an expert technical document analysis assistant. Your task is to extract diagnostic data from the provided text and structure it as a JSON array. Follow these specific steps and patterns to ensure a comprehensive and accurate result.
+
+1.  **Identify and Process Fault/Error Codes**:
+    * Find all codes, which typically match patterns like 'F#E#' (e.g., F3E1) or standard OBD-II formats (e.g., P1234).
+    * For each code, extract its immediate description.
+    * Look for references to test procedures within the code's description, specifically phrases like "See TEST #N".
+
+2.  **Scan for Component Testing Procedures**:
+    * Find sections or blocks that begin with a pattern like 'TEST #N: [Title]' (e.g., TEST #7: Water Level Sensor). The title often contains the component name.
+    * For each of these test blocks, extract all relevant details for both 'pinTests' and 'componentSpecs'.
+    * **Pin Tests**: Look for phrases and patterns that describe measurements across pins or connectors.
+        * **Patterns**: "measure the [resistance/continuity] across pins [1 and 2] of [connector J3]", or "pins [1 and 3]... you should measure [2.9-3.5 VDC]", or "J11-1 to J11-2 [18.5 - 21.5 Ω]".
+        * **Extract**: The component name (from the title), the pin or connector range (e.g., 'J3 pins 1 and 2'), the condition ('Voltage check', 'Resistance check'), and the expected value ('2.9-3.5 VDC', '18.5-21.5 Ω').
+    * **Component Specs**: Look for phrases that describe the component's specifications or baseline measurements.
+        * **Patterns**: "Resistance should be [value]", or data tables that link a condition to a value, like "At 25°C... 5.5 kΩ".
+        * **Extract**: The component name, the test name ('Resistance Spec', 'Temperature-Resistance'), the condition ('At 25°C', 'Room temperature'), and the expected value.
+
+3.  **Synthesize and Link Data**:
+    * **Join Data**: For each fault code identified in step 1, add the `pinTests` and `componentSpecs` from any 'TEST #' procedure that was referenced by that code.
+    * **Handle Unreferenced Tests**: For any 'TEST #' block that was **not** referenced by a fault code, create a separate entry in the output array.
+        * The `code` should be a synthetic value like "COMP-<N>: <Title>".
+        * The `description` should indicate it's for baseline checks.
+        * Set the `severity` to "Low".
+        * Set the `source` to "Component Testing".
+        * Set the `recommendedAction` to "Use for baseline verification or preventive checks.".
+        * Include all `pinTests` and `componentSpecs` harvested from that test block.
+
+4.  **Final Output**: Return a single, valid JSON array that strictly matches the MDCS schema. Do not include any text before or after the JSON.
+
+STRICTNESS MODE: ${strictness[safetyMode]}
+
+TEXT TO ANALYZE:
+---
+${text}
+---`;
+  };
+
+  const callApiWithRetry = async (apiCallFunction, apiName, retries = 3, delay = 1000) => {
+    let lastError;
+    for (let i = 0; i < retries; i++) {
+      try {
+        logEvent(`Calling ${apiName} API (attempt ${i + 1})...`);
+        const result = await apiCallFunction();
+        logEvent(`${apiName} API call successful.`);
+        return result;
+      } catch (err) {
+        lastError = err;
+        logEvent(`${apiName} error: ${err.message}. Retrying in ${delay / 1000}s...`, 'WARN');
+        if (i < retries - 1) await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+      }
+    }
+    throw lastError;
+  };
+
+  const callGeminiAPI = (text) => callApiWithRetry(async () => {
+    const key = geminiApiKeyInput.value?.trim();
+    if (!key) throw new Error('Gemini API key is required for this mode.');
+    const payload = {
+      contents: [{ parts: [{ text: buildAnalysisPrompt(text, safetySelect.value) }] }],
+      generationConfig: { responseMimeType: "application/json", responseSchema: MDCS_SCHEMA }
+    };
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${encodeURIComponent(key)}`;
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) { const errorBody = await res.text(); throw new Error(`Gemini API request failed with status ${res.status}: ${errorBody}`); }
+    const json = await res.json();
+    const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) { logEvent('Gemini response structure unexpected or empty.', 'WARN'); return []; }
+    return normalizeToArray(tryParseJSONLoose(rawText));
+  }, 'Gemini');
+
+  const callOpenAIAPI = (text) => callApiWithRetry(async () => {
+    const key = openaiApiKeyInput.value?.trim();
+    if (!key) throw new Error('OpenAI API key is required for this mode.');
+    const body = {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a precise extraction engine that outputs strictly valid JSON matching the provided schema." },
+        { role: "user", content: buildAnalysisPrompt(text, safetySelect.value) }
+      ],
+      temperature: 0.1
+    };
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) { const errorBody = await res.text(); throw new Error(`OpenAI API request failed with status ${res.status}: ${errorBody}`); }
+    const json = await res.json();
+    const content = json?.choices?.[0]?.message?.content || '';
+    if (!content) { logEvent('OpenAI response was empty.', 'WARN'); return []; }
+    return normalizeToArray(tryParseJSONLoose(content));
+  }, 'OpenAI');
+
+  // --- Main Pipeline ---
+  const processText = async (text) => {
+    currentFileText = text;
+    const mode = modeSelect.value;
+    logEvent(`Processing text using mode: ${mode}`);
+    if (['offline', 'ocr'].includes(mode) || (mode === 'free_tier' && !currentFileText)) {
+      setLoading(true, "Running offline parser…");
+      await new Promise(r => setTimeout(r, 30));
+      const offlineData = parseOffline(currentFileText);
+      renderResults(offlineData);
+      setLoading(false);
+      return;
+    }
+    
+    // Check for API keys before making the call
+    if (mode === 'gemini' && !geminiApiKeyInput.value.trim()) {
+        showMessage('Please enter your Gemini API key to use this mode.', 'error');
+        setLoading(false);
+        return;
+    }
+    if (mode === 'openai' && !openaiApiKeyInput.value.trim()) {
+        showMessage('Please enter your OpenAI API key to use this mode.', 'error');
+        setLoading(false);
+        return;
+    }
+    
+    try {
+      setLoading(true, `Analyzing with ${mode === 'gemini' ? 'Gemini' : 'OpenAI'}...`);
+      const results = (mode === 'gemini') ? await callGeminiAPI(currentFileText) : await callOpenAIAPI(currentFileText);
+      
+      if (!Array.isArray(results) || results.length === 0) {
+        showMessage('AI analysis returned no data. Falling back to offline parser.', 'warn');
+        logEvent('AI returned empty payload; running offline parser as fallback.', 'WARN');
+        const offlineData = parseOffline(currentFileText);
+        renderResults(offlineData);
+      } else {
+        renderResults(results);
+      }
+    } catch (error) {
+      showMessage(`Analysis failed: ${error.message}. You can try the "Offline" mode.`, 'error');
+      logEvent(`Analysis failed (${mode}): ${error.message}`, 'ERROR');
+      forceOfflineBtn.classList.remove('hidden');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- File Handling & Events ---
+  const handleFile = async (file) => {
+    if (!file) return;
+    resetUI();
+    logEvent(`File selected: ${file.name} (Type: ${file.type}, Size: ${file.size} bytes)`);
+    setLoading(true, `Reading file: ${file.name}`);
+    try {
+      let text = '';
+      if (file.type === 'application/pdf') {
+        text = await extractTextFromPdf(file);
+      } else if (file.type.startsWith('image/')) {
+        const mode = modeSelect.value;
+        if (mode !== 'ocr' && mode !== 'free_tier') {
+            showMessage('Selected mode is not configured for image OCR. Please switch to "Offline + OCR" mode.', 'warn');
+            setLoading(false);
+            return;
+        }
+        text = await extractTextFromImage(file);
+      } else if (file.type === 'text/plain') {
+        text = await file.text();
+      } else {
+        throw new Error(`Unsupported file type: ${file.type}. Please use PDF, TXT, PNG, or JPG.`);
+      }
+      logEvent(`Extracted ${text.length} characters from file.`);
+      if (text.trim().length === 0) {
+          throw new Error('No text could be extracted. For scanned PDFs or images, ensure the "Offline + OCR" mode is selected.');
+      }
+      await processText(text);
+    } catch (err) {
+      showMessage(`Error processing file: ${err.message}`, 'error');
+      logEvent(`File processing failed: ${err.message}`, 'ERROR');
+      setLoading(false);
+    }
+  };
+
+  modeSelect.addEventListener('change', () => {
+    const mode = modeSelect.value;
+    const isApiMode = ['gemini', 'openai', 'custom'].includes(mode);
+    endpointSettings.classList.toggle('hidden', !isApiMode);
+    customEndpointLabel.classList.toggle('hidden', mode !== 'custom');
+    geminiApiKeyLabel.classList.toggle('hidden', mode !== 'gemini');
+    openaiApiKeyLabel.classList.toggle('hidden', mode !== 'openai');
+    logEvent(`Switched mode to: ${mode}`);
+    // Clear the force offline button
+    forceOfflineBtn.classList.add('hidden');
+  });
+  openFileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+  sampleBtn.addEventListener('click', () => {
+    logEvent('Loading sample diagnostic text.');
+    const sampleText = `
+FAULT/ERROR CODE CHART
+F3E1 Water Level Sensor Fault • See TEST #7: Water Level Sensor.
+F4E1 Wash heater relay error • See TEST #9: Wash Heating Element.
+
+COMPONENT TESTING
+TEST #7: Water Level Sensor
+... J16, pins 1 and 3 ... you should measure 2.9-3.5 VDC.
+TEST #9: Wash Heating Element
+... measure the resistance across pins 1 and 2 of connector J3. If the resistance is 7-30 Ω ...
+DRAIN/RECIRCULATION PUMP
+Drain Pump J11-1 to J11-2 18.5 - 21.5 Ω
+Recirculation Pump J11-3 to J11-4 36 - 46 Ω
+Valve Pinout
+Cold 1 Fill Valve J8, pins 1 & 2
+Cold 2 Fill Valve J8, pins 1 & 3
+Hot 1 Fill Valve J8, pins 1 & 5
+Resistance should be 1.1 - 1.35k Ω.
+`;
+    const sampleFile = new File([sampleText], "sample-diagnostic-report.txt", { type: "text/plain" });
+    handleFile(sampleFile);
+  });
+
+  forceOfflineBtn.addEventListener('click', () => {
+      if (currentFileText) {
+          logEvent('Manually forcing offline parser.');
+          setLoading(true, 'Running offline parser...');
+          const offlineData = parseOffline(currentFileText);
+          renderResults(offlineData);
+          setLoading(false);
+      } else {
+          showMessage('No file loaded to process.', 'warn');
+      }
+      forceOfflineBtn.classList.add('hidden');
+  });
+
+  viewSchemaBtn.addEventListener('click', () => {
+    schemaSection.classList.toggle('hidden');
+    logEvent(`Schema view toggled ${schemaSection.classList.contains('hidden') ? 'off' : 'on'}.`);
+  });
+  clearBtn.addEventListener('click', resetUI);
+
+  // Delegated clicks
+  resultsGrid.addEventListener('click', (e) => {
+    const copyBtn = e.target.closest('.copy-btn');
+    if (copyBtn) {
+      copyToClipboard(copyBtn.dataset.value, copyBtn);
+      return;
+    }
+    const reportBtn = e.target.closest('.copy-report-btn');
+    if (reportBtn) {
+      const card = reportBtn.closest('.diag-card');
+      const code = card.querySelector('.card-code').textContent.trim();
+      const data = extractedData.find(d => d.code === code);
+      if (data) {
+        let reportText = `DIAGNOSTIC REPORT: ${data.code}\n================================\n`;
+        reportText += `Description: ${data.description}\nSeverity: ${data.severity}\nSource: ${data.source}\nAction: ${data.recommendedAction}\n\n`;
+        if (data.pinTests && data.pinTests.length) {
+          reportText += `--- PIN TESTS ---\n`;
+          data.pinTests.forEach(t => { reportText += `- ${t.component} | ${t.pin} | ${t.condition} -> ${t.expectedValue}\n`; });
+          reportText += `\n`;
+        }
+        if (data.componentSpecs && data.componentSpecs.length) {
+          reportText += `--- COMPONENT SPECS ---\n`;
+          data.componentSpecs.forEach(t => { reportText += `- ${t.component} | ${t.testName} | ${t.condition} -> ${t.expectedValue}\n`; });
+        }
+        copyToClipboard(reportText, reportBtn);
+      }
+    }
+  });
+
+  // Drag & Drop
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drop-zone-over'); });
+  dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); dropZone.classList.remove('drop-zone-over'); });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.remove('drop-zone-over');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFile(e.dataTransfer.files[0]);
+      e.dataTransfer.clearData();
+    }
+  });
+
+  // Export
+  exportLogBtn.addEventListener('click', () => downloadFile(JSON.stringify(auditLog, null, 2), 'diagnostic-log.json', 'application/json'));
+  exportJsonBtn.addEventListener('click', () => { if (extractedData.length) downloadFile(JSON.stringify(extractedData, null, 2), 'extracted-codes.json', 'application/json'); });
+  exportCsvBtn.addEventListener('click', () => {
+    if (!extractedData.length) return;
+    const headers = ['code', 'description', 'severity', 'source', 'recommendedAction'];
+    let csv = headers.map(h => `"${h}"`).join(',') + '\n';
+    extractedData.forEach(row => {
+      const vals = headers.map(h => `"${(row[h] || '').toString().replace(/"/g, '""')}"`);
+      csv += vals.join(',') + '\n';
+    });
+    downloadFile(csv, 'extracted-codes.csv', 'text/csv');
+  });
+
+  // Keyboard shortcut: 'U' for Upload
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'u' && !['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) {
+      e.preventDefault();
+      openFileBtn.click();
+    }
+  });
+
+  // Init
+  const init = () => {
+    schemaContent.textContent = JSON.stringify(MDCS_SCHEMA, null, 2);
+    const schemaString = JSON.stringify(MDCS_SCHEMA);
+    let hash = 0;
+    for (let i = 0; i < schemaString.length; i++) {
+      hash = ((hash << 5) - hash) + schemaString.charCodeAt(i);
+      hash |= 0;
+    }
+    checksumLine.textContent = `MDCS Hash: ${Math.abs(hash).toString(16).toUpperCase()}`;
+    modeSelect.dispatchEvent(new Event('change'));
+    logEvent('Application initialized.');
+  };
+  init();
+});
+</script>
+</body>
+</html>
