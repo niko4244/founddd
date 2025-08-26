@@ -764,6 +764,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const componentSpecs = [];
       const componentName = title.split(/\s*:\s*/)[0].replace(/TEST\s*#\d+\s*$/i, '').trim();
 
+      // Helpers for unit normalization
+      const normalizeOhmsValue = (val) => {
+        if (!val) return '';
+        return val
+          .replace(/\s+/g, ' ')
+          .replace(/k\s*(?:ohm|Ω)/ig, 'k Ω')
+          .replace(/ohms?/ig, 'Ω')
+          .replace(/Ω/g, 'Ω')
+          .trim();
+      };
+      const normalizeVoltageValue = (val) => {
+        if (!val) return '';
+        const cleaned = val.replace(/\s+/g, ' ').trim();
+        if (/v\s*(dc|ac)/i.test(cleaned)) return cleaned.toUpperCase().replace(/\s+/g, ' ');
+        return cleaned + ' V';
+      };
+
       const addPin = (component, pin, condition, expected) => {
         if (!component || !pin || !expected) return;
         pinTests.push({
@@ -787,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const tableRowRegex = /([A-Za-z][A-Za-z0-9\/\-\s]+?)\s+(J\d+-\d+\s*(?:to|&|and|-)\s*J\d+-\d+)\s+([0-9.]+\s*(?:-\s*[0-9.]+\s*)?(?:k)?\s*Ω)/gi;
       let tr;
       while ((tr = tableRowRegex.exec(block)) !== null) {
-        addPin(tr[1], tr[2], 'Room temperature check', tr[3].replace(/\s+/g, ' ').trim());
+        addPin(tr[1], tr[2], 'Room temperature check', normalizeOhmsValue(tr[3]));
       }
       
       // Pinout block + default resistance/voltage
@@ -801,45 +818,71 @@ document.addEventListener('DOMContentLoaded', () => {
           pinoutMap.push({ comp: ln[1].trim(), conn: ln[2].trim(), pinsOnly: ln[3].trim().replace(/\s+/g, ' ') });
         }
         
-        const resMatch = block.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*Ω)/i);
+        const resMatch = block.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*(?:Ω|ohms?))/i);
         if(resMatch) {
-            const defaultExpected = resMatch[1].replace(/\s+/g, ' ').trim();
+            const defaultExpected = normalizeOhmsValue(resMatch[1]);
             pinoutMap.forEach(p => addPin(p.comp, `${p.conn} pins ${p.pinsOnly}`, 'Coil resistance (connector removed)', defaultExpected));
         }
-        const voltMatch = block.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+V(?:DC|AC)?)/i);
+        const voltMatch = block.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+\s*V(?:DC|AC)?)/i);
         if(voltMatch) {
-            const defaultExpected = voltMatch[1].replace(/\s+/g, ' ').trim();
+            const defaultExpected = normalizeVoltageValue(voltMatch[1]);
             pinoutMap.forEach(p => addPin(p.comp, `${p.conn} pins ${p.pinsOnly}`, 'Voltage check', defaultExpected));
         }
       }
 
       // Measured resistance/continuity across pins
-      const measureResRegex = /measure\s+the\s+(?:resistance|continuity)\s+across\s+pins?\s*([0-9A-Za-z\-\s&andto]+)\s+(?:of\s+)?(?:connector\s+)?(J\d+)/gi;
+      const measureResRegex = /measure\s+the\s+(?:resistance|continuity)\s+(?:across|between)\s+pins?\s*([0-9A-Za-z\-\s&andto]+)\s+(?:of\s+|at\s+|on\s+)?(?:connector\s+)?(J\d+)/gi;
       let mr;
       while ((mr = measureResRegex.exec(block)) !== null) {
         const pinsHuman = mr[1].replace(/\s+and\s+/i, ' to ').replace(/\s+/g, ' ').trim();
         const conn = mr[2];
         const near = block.slice(mr.index, Math.min(block.length, mr.index + 300));
-        const ohm = (near.match(/([0-9.]+\s*-\s*[0-9.]+|[0-9.]+)\s*(k)?\s*Ω/i) || [,''])[0];
+        const ohm = (near.match(/([0-9.]+\s*-\s*[0-9.]+|[0-9.]+)\s*(k)?\s*(?:Ω|ohms?)/i) || [,''])[0];
         const resOrCont = near.match(/resistance/i) ? 'Resistance' : 'Continuity';
-        addPin(componentName, `${conn} pins ${pinsHuman}`, `${resOrCont} check`, ohm || 'See step range');
+        addPin(componentName, `${conn} pins ${pinsHuman}`, `${resOrCont} check`, normalizeOhmsValue(ohm || 'See step range'));
       }
       
       // Voltage check patterns (more generic)
       const voltRegex = /(?:you\s+should\s+measure|measure)\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?\s+at\s+(?:the\s+)?(J\d+),?\s*pins?\s*([0-9\s&and\-]+)/gi;
       let vr;
       while ((vr = voltRegex.exec(block)) !== null) {
-          const range = vr[1].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim() + ' V';
+          const range = normalizeVoltageValue(vr[1].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim());
           const conn = vr[2];
           const pinsOnly = vr[3].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
           addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', range);
       }
 
+      // Alternate ordering: connector and pins mentioned before the measurement clause
+      const voltRegexAlt = /(J\d+),?\s*pins?\s*([0-9\s&and\-]+)[\s\S]{0,150}?(?:you\s+should\s+)?measure\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?/gi;
+      let vra;
+      while ((vra = voltRegexAlt.exec(block)) !== null) {
+        const conn = vra[1];
+        const pinsOnly = vra[2].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
+        const range = normalizeVoltageValue(vra[3].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim());
+        addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', range);
+      }
+
+      // Generic pins-at-connector with nearby value (Ω or V) when phrasing varies
+      const genericPinsAtRegex = /pins?\s*([0-9A-Za-z\s&\-]+)\s*(?:at|on|of)\s*(?:connector\s+)?(J\d+)/gi;
+      let gp;
+      while ((gp = genericPinsAtRegex.exec(block)) !== null) {
+        const pinsOnly = gp[1].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
+        const conn = gp[2];
+        const near = block.slice(gp.index, Math.min(block.length, gp.index + 220));
+        const voltNear = near.match(/([0-9.]+\s*(?:-\s*[0-9.]+)?)\s*V(?:DC|AC)?/i);
+        const ohmNear = near.match(/([0-9.]+\s*(?:-\s*[0-9.]+)?)\s*(k)?\s*(?:Ω|ohms?)/i);
+        if (voltNear) {
+          addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', normalizeVoltageValue(voltNear[1].replace(/\s+/g, ' ')));
+        } else if (ohmNear) {
+          addPin(componentName, `${conn} pins ${pinsOnly}`, 'Resistance check', normalizeOhmsValue(ohmNear[0]));
+        }
+      }
+
       // Component specs sentences and temp tables
-      const specResRegex = /Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*Ω)/ig;
+      const specResRegex = /(Resistance|resistance)\s+(?:should\s+be|is|should\s+measure)\s+([0-9.\s\-]+k?\s*(?:Ω|ohms?))/ig;
       let sr;
       while ((sr = specResRegex.exec(block)) !== null) {
-        addSpec(componentName, 'Resistance Spec', 'Room temperature', sr[1].replace(/\s+/g, ' ').trim());
+        addSpec(componentName, 'Resistance Spec', 'Room temperature', normalizeOhmsValue(sr[2]));
       }
       const tempTableRegex = /At\s+([0-9]+)\s*°C[^\.]*?\s*([0-9.]+)\s*(k)?\s*Ω/ig;
       let tt;
