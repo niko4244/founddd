@@ -201,6 +201,7 @@
             <button id="apiSettingsBtn" class="btn-small btn-secondary">API Settings</button>
             <button id="viewErrorsBtn" class="btn-small btn-secondary">View Errors</button>
             <button id="viewMemoryBtn" class="btn-small btn-secondary">Memory Insights</button>
+            <button id="retryBtn" class="btn-small btn-secondary" disabled>Retry Analysis</button>
             <button id="exportLogBtn" class="btn-small btn-secondary" disabled>Export Log</button>
             <button id="clearBtn" class="btn-small btn-danger">Start New</button>
           </div>
@@ -313,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportJsonBtn = document.getElementById('exportJsonBtn');
   const forceOfflineBtn = document.getElementById('forceOfflineBtn');
   const apiSettingsBtn = document.getElementById('apiSettingsBtn');
+  const retryBtn = document.getElementById('retryBtn');
   const viewErrorsBtn = document.getElementById('viewErrorsBtn');
   const errorLogSection = document.getElementById('errorLogSection');
   const errorContent = document.getElementById('errorContent');
@@ -518,6 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
     extractedData = [];
     currentFileText = '';
     forceOfflineBtn.classList.add('hidden');
+    if (retryBtn) retryBtn.disabled = true;
     // Do not clear persistent error/memory here; just hide sections
     if (errorLogSection) errorLogSection.classList.add('hidden');
     if (memorySection) memorySection.classList.add('hidden');
@@ -1119,6 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
           throw new Error('No text could be extracted. For scanned PDFs or images, ensure the "Offline + OCR" mode is selected.');
       }
       await processText(text);
+      if (retryBtn) retryBtn.disabled = false;
     } catch (err) {
       showMessage(`Error processing file: ${err.message}`, 'error');
       logEvent(`File processing failed: ${err.message}`, 'ERROR');
@@ -1145,6 +1149,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   openFileBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+  if (retryBtn) {
+    retryBtn.addEventListener('click', async () => {
+      if (!currentFileText || !currentFileText.trim()) {
+        showMessage('No document loaded to retry.', 'warn');
+        return;
+      }
+      logEvent('Retrying analysis on current text.');
+      await processText(currentFileText);
+    });
+  }
   // API Settings button
   if (apiSettingsBtn) {
     apiSettingsBtn.addEventListener('click', () => {
