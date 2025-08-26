@@ -149,6 +149,7 @@
                 <option value="free_tier" selected>Free Tier (Offline Fallback)</option>
                 <option value="gemini">Gemini API (JSON schema)</option>
                 <option value="openai">OpenAI API (JSON)</option>
+                <option value="client">Client API (same-origin)</option>
                 <option value="offline">Offline (Manual Parse)</option>
                 <option value="ocr">Offline + OCR for images (Tesseract)</option>
                 <option value="custom">Custom HTTP Endpoint</option>
@@ -1005,6 +1006,30 @@ document.addEventListener('DOMContentLoaded', () => {
     return normalizeToArray(tryParseJSONLoose(content));
   }, 'OpenAI');
 
+  const callClientAPI = (text) => callApiWithRetry(async () => {
+    const res = await fetch('/api/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, safety: safetySelect.value })
+    });
+    if (!res.ok) { const body = await res.text(); throw new Error(`Client API failed: ${res.status} ${body}`); }
+    const json = await res.json();
+    return normalizeToArray(json);
+  }, 'Client');
+
+  const callCustomAPI = (text) => callApiWithRetry(async () => {
+    const url = endpointInput.value?.trim();
+    if (!url) throw new Error('Custom endpoint URL is required.');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, safety: safetySelect.value })
+    });
+    if (!res.ok) { const body = await res.text(); throw new Error(`Custom API failed: ${res.status} ${body}`); }
+    const json = await res.json();
+    return normalizeToArray(json);
+  }, 'Custom');
+
   // --- Main Pipeline ---
   const processText = async (text) => {
     currentFileText = text;
@@ -1039,8 +1064,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     try {
-      setLoading(true, `Analyzing with ${mode === 'gemini' ? 'Gemini' : 'OpenAI'}...`);
-      const results = (mode === 'gemini') ? await callGeminiAPI(currentFileText) : await callOpenAIAPI(currentFileText);
+      setLoading(true, `Analyzing with ${mode === 'gemini' ? 'Gemini' : mode === 'openai' ? 'OpenAI' : mode === 'client' ? 'Client API' : 'Custom API'}...`);
+      let results = [];
+      if (mode === 'gemini') results = await callGeminiAPI(currentFileText);
+      else if (mode === 'openai') results = await callOpenAIAPI(currentFileText);
+      else if (mode === 'client') results = await callClientAPI(currentFileText);
+      else if (mode === 'custom') results = await callCustomAPI(currentFileText);
       
       if (!Array.isArray(results) || results.length === 0) {
         showMessage('AI analysis returned no data. Falling back to offline parser.', 'warn');
