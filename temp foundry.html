@@ -149,6 +149,7 @@
                 <option value="free_tier" selected>Free Tier (Offline Fallback)</option>
                 <option value="gemini">Gemini API (JSON schema)</option>
                 <option value="openai">OpenAI API (JSON)</option>
+                <option value="client">Client API (same-origin)</option>
                 <option value="offline">Offline (Manual Parse)</option>
                 <option value="ocr">Offline + OCR for images (Tesseract)</option>
                 <option value="custom">Custom HTTP Endpoint</option>
@@ -197,6 +198,10 @@
           </ul>
           <div class="button-group">
             <button id="viewSchemaBtn" class="btn-small btn-secondary">View MDCS</button>
+            <button id="apiSettingsBtn" class="btn-small btn-secondary">API Settings</button>
+            <button id="viewErrorsBtn" class="btn-small btn-secondary">View Errors</button>
+            <button id="viewMemoryBtn" class="btn-small btn-secondary">Memory Insights</button>
+            <button id="retryBtn" class="btn-small btn-secondary" disabled>Retry Analysis</button>
             <button id="exportLogBtn" class="btn-small btn-secondary" disabled>Export Log</button>
             <button id="clearBtn" class="btn-small btn-danger">Start New</button>
           </div>
@@ -233,6 +238,32 @@
       <div class="audit-header"><h2 class="audit-title">Audit Log</h2></div>
       <div class="log-container">
         <div id="logContent" class="log-content"></div>
+      </div>
+    </section>
+
+    <!-- Error Log -->
+    <section id="errorLogSection" class="audit-log hidden">
+      <div class="audit-header"><h2 class="audit-title">Error Log</h2></div>
+      <div class="log-container">
+        <div id="errorContent" class="log-content"></div>
+      </div>
+      <div class="button-group" style="margin-top:.5rem">
+        <button id="exportErrorsBtn" class="btn-small btn-secondary" disabled>Export Errors</button>
+        <button id="clearErrorsBtn" class="btn-small btn-danger" disabled>Clear Errors</button>
+      </div>
+    </section>
+
+    <!-- Memory Insights -->
+    <section id="memorySection" class="schema-section hidden">
+      <div class="schema-details">
+        <details open>
+          <summary class="schema-summary">Learned Diagnostic Memory</summary>
+          <div id="memoryContent" class="schema-content"></div>
+          <div class="button-group" style="margin-top:.5rem">
+            <button id="exportMemoryBtn" class="btn-small btn-secondary" disabled>Export Memory</button>
+            <button id="clearMemoryBtn" class="btn-small btn-danger" disabled>Clear Memory</button>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -282,6 +313,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportCsvBtn = document.getElementById('exportCsvBtn');
   const exportJsonBtn = document.getElementById('exportJsonBtn');
   const forceOfflineBtn = document.getElementById('forceOfflineBtn');
+  const apiSettingsBtn = document.getElementById('apiSettingsBtn');
+  const retryBtn = document.getElementById('retryBtn');
+  const viewErrorsBtn = document.getElementById('viewErrorsBtn');
+  const errorLogSection = document.getElementById('errorLogSection');
+  const errorContent = document.getElementById('errorContent');
+  const exportErrorsBtn = document.getElementById('exportErrorsBtn');
+  const clearErrorsBtn = document.getElementById('clearErrorsBtn');
+  const viewMemoryBtn = document.getElementById('viewMemoryBtn');
+  const memorySection = document.getElementById('memorySection');
+  const memoryContent = document.getElementById('memoryContent');
+  const exportMemoryBtn = document.getElementById('exportMemoryBtn');
+  const clearMemoryBtn = document.getElementById('clearMemoryBtn');
 
   // --- App State ---
   let auditLog = [];
@@ -348,6 +391,111 @@ document.addEventListener('DOMContentLoaded', () => {
     messageBox.classList.remove('hidden');
     logEvent(`Message: ${msg}`, kind.toUpperCase());
   };
+  const saveSetting = (key, value) => {
+    try { localStorage.setItem(key, value || ''); } catch (_) {}
+  };
+  const getSetting = (key) => {
+    try { return localStorage.getItem(key) || ''; } catch (_) { return ''; }
+  };
+  const saveJSON = (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  };
+  const loadJSON = (key, fallback) => {
+    try {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : fallback;
+    } catch (_) { return fallback; }
+  };
+
+  // Error log utilities
+  let errorLog = loadJSON('diagErrorLog', []);
+  const logError = (message, detail) => {
+    const ts = new Date().toISOString();
+    const entry = { timestamp: ts, message, detail: detail || '' };
+    errorLog.push(entry);
+    saveJSON('diagErrorLog', errorLog);
+    if (errorContent) {
+      const line = document.createElement('div');
+      line.textContent = `[${ts}] ${message}${detail ? ' :: ' + detail : ''}`;
+      errorContent.appendChild(line);
+      errorLogSection.classList.remove('hidden');
+      exportErrorsBtn.disabled = errorLog.length === 0;
+      clearErrorsBtn.disabled = errorLog.length === 0;
+    }
+  };
+
+  window.addEventListener('error', (ev) => {
+    const msg = ev?.message || 'Unknown window error';
+    logError(msg);
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    const reason = ev?.reason?.message || ev?.reason || 'unhandledrejection';
+    logError('Unhandled Promise rejection', String(reason));
+  });
+
+  const renderErrorLog = () => {
+    if (!errorContent) return;
+    errorContent.innerHTML = '';
+    errorLog.forEach(e => {
+      const line = document.createElement('div');
+      line.textContent = `[${e.timestamp}] ${e.message}${e.detail ? ' :: ' + e.detail : ''}`;
+      errorContent.appendChild(line);
+    });
+    exportErrorsBtn.disabled = errorLog.length === 0;
+    clearErrorsBtn.disabled = errorLog.length === 0;
+  };
+
+  // Memory utilities
+  let diagMemory = loadJSON('diagMemory', { codes: {} });
+  const updateMemoryWithResults = (data) => {
+    if (!Array.isArray(data)) return;
+    const now = Date.now();
+    data.forEach(item => {
+      const code = (item?.code || '').toString();
+      if (!code) return;
+      if (!diagMemory.codes[code]) {
+        diagMemory.codes[code] = { count: 0, lastSeen: 0, severity: item.severity || 'Medium' };
+      }
+      diagMemory.codes[code].count += 1;
+      diagMemory.codes[code].lastSeen = now;
+      diagMemory.codes[code].severity = item.severity || diagMemory.codes[code].severity || 'Medium';
+    });
+    saveJSON('diagMemory', diagMemory);
+    renderMemoryInsights();
+  };
+
+  const renderMemoryInsights = () => {
+    if (!memoryContent) return;
+    const codes = diagMemory.codes || {};
+    const entries = Object.entries(codes);
+    if (entries.length === 0) {
+      memoryContent.textContent = 'No memory yet. Process some diagnostics to learn.';
+      exportMemoryBtn.disabled = true;
+      clearMemoryBtn.disabled = true;
+      return;
+    }
+    // Top 10 by frequency
+    const top = entries.sort((a,b)=>b[1].count - a[1].count).slice(0, 10);
+    const lines = [];
+    lines.push('Top observed codes (by frequency):');
+    top.forEach(([code, meta], idx) => {
+      const last = new Date(meta.lastSeen).toLocaleString();
+      lines.push(`${idx+1}. ${code} — count=${meta.count}, lastSeen=${last}, severity=${meta.severity}`);
+    });
+    // Simple projection: codes seen in last 30 days sorted by recency with frequency weight
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const recent = entries.filter(([,m]) => (now - (m.lastSeen||0)) <= THIRTY_DAYS)
+                          .sort((a,b)=> (b[1].count*2 + b[1].lastSeen/1e12) - (a[1].count*2 + a[1].lastSeen/1e12))
+                          .map(([code])=>code);
+    if (recent.length) {
+      lines.push('Projected/suspected upcoming issues:');
+      lines.push(recent.slice(0,5).map((c,i)=>`${i+1}. ${c}`).join('\n'));
+    }
+    memoryContent.textContent = lines.join('\n');
+    exportMemoryBtn.disabled = false;
+    clearMemoryBtn.disabled = false;
+  };
   const setLoading = (show, text = 'Analyzing...', progress = 0) => {
     loadingIndicator.classList.toggle('hidden', !show);
     if (show) {
@@ -372,6 +520,10 @@ document.addEventListener('DOMContentLoaded', () => {
     extractedData = [];
     currentFileText = '';
     forceOfflineBtn.classList.add('hidden');
+    if (retryBtn) retryBtn.disabled = true;
+    // Do not clear persistent error/memory here; just hide sections
+    if (errorLogSection) errorLogSection.classList.add('hidden');
+    if (memorySection) memorySection.classList.add('hidden');
     logEvent('UI reset complete.');
   };
   const copyToClipboard = async (text, element) => {
@@ -447,6 +599,89 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data && Array.isArray(data.mdcs)) return data.mdcs;
     if (data && Array.isArray(data.items)) return data.items;
     return [];
+  };
+
+  // --- Normalization & Enrichment Helpers ---
+  const normalizeOhmsValueGlobal = (val) => {
+    if (!val) return '';
+    return String(val)
+      .replace(/\s+/g, ' ')
+      .replace(/k\s*(?:ohm|Ω)/ig, 'k Ω')
+      .replace(/ohms?/ig, 'Ω')
+      .replace(/Ω/g, 'Ω')
+      .trim();
+  };
+  const normalizeVoltageValueGlobal = (val) => {
+    if (!val) return '';
+    const cleaned = String(val).replace(/\s+/g, ' ').trim();
+    if (/v\s*(dc|ac)/i.test(cleaned)) return cleaned.toUpperCase().replace(/\s+/g, ' ');
+    if (/v$/i.test(cleaned)) return cleaned.toUpperCase();
+    return cleaned + ' V';
+  };
+  const normalizeExpectedValue = (val) => {
+    if (!val) return '';
+    const s = String(val);
+    if (/(Ω|ohm)/i.test(s)) return normalizeOhmsValueGlobal(s);
+    if (/\bV\b|VDC|VAC/i.test(s)) return normalizeVoltageValueGlobal(s);
+    return s.trim();
+  };
+  const dedupeByKey = (arr, keyFn) => {
+    const seen = new Set();
+    const out = [];
+    (arr || []).forEach(it => {
+      const k = keyFn(it);
+      if (k && !seen.has(k)) { seen.add(k); out.push(it); }
+    });
+    return out;
+  };
+  const enrichResultsWithOffline = (aiResults, offlineData) => {
+    const results = Array.isArray(aiResults) ? JSON.parse(JSON.stringify(aiResults)) : [];
+    const offline = Array.isArray(offlineData) ? offlineData : [];
+    const byCode = new Map();
+    results.forEach(r => { if (r && r.code) byCode.set(r.code, r); });
+    const globalEntry = offline.find(o => typeof o.code === 'string' && o.code.startsWith('COMP-GLOBAL')) || null;
+    const globalPins = (globalEntry && Array.isArray(globalEntry.pinTests)) ? globalEntry.pinTests : [];
+    const componentToGlobalPins = globalPins.reduce((acc, p) => {
+      const key = (p.component || '').toLowerCase();
+      (acc[key] = acc[key] || []).push(p);
+      return acc;
+    }, {});
+
+    // Merge per-code from offline
+    results.forEach(item => {
+      const off = offline.find(o => o.code === item.code);
+      const mergedPins = [...(item.pinTests || []), ...((off && off.pinTests) || [])];
+      const mergedSpecs = [...(item.componentSpecs || []), ...((off && off.componentSpecs) || [])];
+      // Heuristic: attach global pins if component name appears in description
+      const descLower = (item.description || '').toLowerCase();
+      Object.keys(componentToGlobalPins).forEach(compKey => {
+        if (compKey && descLower.includes(compKey)) {
+          mergedPins.push(...componentToGlobalPins[compKey]);
+        }
+      });
+      // Normalize and dedupe
+      item.pinTests = dedupeByKey(mergedPins.map(p => ({
+        component: p.component,
+        pin: p.pin,
+        condition: p.condition,
+        expectedValue: normalizeExpectedValue(p.expectedValue)
+      })), t => `${(t.component||'').toLowerCase()}|${(t.pin||'').toLowerCase()}|${(t.condition||'').toLowerCase()}|${(t.expectedValue||'').toLowerCase()}`);
+      item.componentSpecs = dedupeByKey(mergedSpecs.map(s => ({
+        component: s.component,
+        testName: s.testName,
+        condition: s.condition,
+        expectedValue: normalizeExpectedValue(s.expectedValue)
+      })), t => `${(t.component||'').toLowerCase()}|${(t.testName||'').toLowerCase()}|${(t.condition||'').toLowerCase()}|${(t.expectedValue||'').toLowerCase()}`);
+    });
+
+    // Append offline items not present in AI output (component-only and global)
+    offline.forEach(off => {
+      if (!byCode.has(off.code)) {
+        results.push(off);
+      }
+    });
+
+    return results;
   };
 
   // --- Rendering ---
@@ -564,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const end = (i + 1 < codeMatches.length) ? codeMatches[i + 1].index : text.length;
       const block = text.slice(start, end);
       
-      const code = (curr[1] || '').replace(/\s+/g, '').toUpperCase();
+      const code = (curr[0] || curr[1] || '').replace(/\s+/g, '').toUpperCase();
       if (!code) continue;
 
       let desc = '';
@@ -612,6 +847,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const componentSpecs = [];
       const componentName = title.split(/\s*:\s*/)[0].replace(/TEST\s*#\d+\s*$/i, '').trim();
 
+      // Helpers for unit normalization
+      const normalizeOhmsValue = (val) => {
+        if (!val) return '';
+        return val
+          .replace(/\s+/g, ' ')
+          .replace(/k\s*(?:ohm|Ω)/ig, 'k Ω')
+          .replace(/ohms?/ig, 'Ω')
+          .replace(/Ω/g, 'Ω')
+          .trim();
+      };
+      const normalizeVoltageValue = (val) => {
+        if (!val) return '';
+        const cleaned = val.replace(/\s+/g, ' ').trim();
+        if (/v\s*(dc|ac)/i.test(cleaned)) return cleaned.toUpperCase().replace(/\s+/g, ' ');
+        return cleaned + ' V';
+      };
+
       const addPin = (component, pin, condition, expected) => {
         if (!component || !pin || !expected) return;
         pinTests.push({
@@ -635,7 +887,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const tableRowRegex = /([A-Za-z][A-Za-z0-9\/\-\s]+?)\s+(J\d+-\d+\s*(?:to|&|and|-)\s*J\d+-\d+)\s+([0-9.]+\s*(?:-\s*[0-9.]+\s*)?(?:k)?\s*Ω)/gi;
       let tr;
       while ((tr = tableRowRegex.exec(block)) !== null) {
-        addPin(tr[1], tr[2], 'Room temperature check', tr[3].replace(/\s+/g, ' ').trim());
+        addPin(tr[1], tr[2], 'Room temperature check', normalizeOhmsValue(tr[3]));
       }
       
       // Pinout block + default resistance/voltage
@@ -649,45 +901,71 @@ document.addEventListener('DOMContentLoaded', () => {
           pinoutMap.push({ comp: ln[1].trim(), conn: ln[2].trim(), pinsOnly: ln[3].trim().replace(/\s+/g, ' ') });
         }
         
-        const resMatch = block.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*Ω)/i);
+        const resMatch = block.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*(?:Ω|ohms?))/i);
         if(resMatch) {
-            const defaultExpected = resMatch[1].replace(/\s+/g, ' ').trim();
+            const defaultExpected = normalizeOhmsValue(resMatch[1]);
             pinoutMap.forEach(p => addPin(p.comp, `${p.conn} pins ${p.pinsOnly}`, 'Coil resistance (connector removed)', defaultExpected));
         }
-        const voltMatch = block.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+V(?:DC|AC)?)/i);
+        const voltMatch = block.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+\s*V(?:DC|AC)?)/i);
         if(voltMatch) {
-            const defaultExpected = voltMatch[1].replace(/\s+/g, ' ').trim();
+            const defaultExpected = normalizeVoltageValue(voltMatch[1]);
             pinoutMap.forEach(p => addPin(p.comp, `${p.conn} pins ${p.pinsOnly}`, 'Voltage check', defaultExpected));
         }
       }
 
       // Measured resistance/continuity across pins
-      const measureResRegex = /measure\s+the\s+(?:resistance|continuity)\s+across\s+pins?\s*([0-9A-Za-z\-\s&andto]+)\s+(?:of\s+)?(?:connector\s+)?(J\d+)/gi;
+      const measureResRegex = /measure\s+the\s+(?:resistance|continuity)\s+(?:across|between)\s+pins?\s*([0-9A-Za-z\-\s&andto]+)\s+(?:of\s+|at\s+|on\s+)?(?:connector\s+)?(J\d+)/gi;
       let mr;
       while ((mr = measureResRegex.exec(block)) !== null) {
         const pinsHuman = mr[1].replace(/\s+and\s+/i, ' to ').replace(/\s+/g, ' ').trim();
         const conn = mr[2];
         const near = block.slice(mr.index, Math.min(block.length, mr.index + 300));
-        const ohm = (near.match(/([0-9.]+\s*-\s*[0-9.]+|[0-9.]+)\s*(k)?\s*Ω/i) || [,''])[0];
+        const ohm = (near.match(/([0-9.]+\s*-\s*[0-9.]+|[0-9.]+)\s*(k)?\s*(?:Ω|ohms?)/i) || [,''])[0];
         const resOrCont = near.match(/resistance/i) ? 'Resistance' : 'Continuity';
-        addPin(componentName, `${conn} pins ${pinsHuman}`, `${resOrCont} check`, ohm || 'See step range');
+        addPin(componentName, `${conn} pins ${pinsHuman}`, `${resOrCont} check`, normalizeOhmsValue(ohm || 'See step range'));
       }
       
       // Voltage check patterns (more generic)
       const voltRegex = /(?:you\s+should\s+measure|measure)\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?\s+at\s+(?:the\s+)?(J\d+),?\s*pins?\s*([0-9\s&and\-]+)/gi;
       let vr;
       while ((vr = voltRegex.exec(block)) !== null) {
-          const range = vr[1].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim() + ' V';
+          const range = normalizeVoltageValue(vr[1].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim());
           const conn = vr[2];
           const pinsOnly = vr[3].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
           addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', range);
       }
 
+      // Alternate ordering: connector and pins mentioned before the measurement clause
+      const voltRegexAlt = /(J\d+),?\s*pins?\s*([0-9\s&and\-]+)[\s\S]{0,150}?(?:you\s+should\s+)?measure\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?/gi;
+      let vra;
+      while ((vra = voltRegexAlt.exec(block)) !== null) {
+        const conn = vra[1];
+        const pinsOnly = vra[2].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
+        const range = normalizeVoltageValue(vra[3].replace(/\s+to\s+/i, '-').replace(/\s+/g, ' ').trim());
+        addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', range);
+      }
+
+      // Generic pins-at-connector with nearby value (Ω or V) when phrasing varies
+      const genericPinsAtRegex = /pins?\s*([0-9A-Za-z\s&\-]+)\s*(?:at|on|of)\s*(?:connector\s+)?(J\d+)/gi;
+      let gp;
+      while ((gp = genericPinsAtRegex.exec(block)) !== null) {
+        const pinsOnly = gp[1].replace(/\s+and\s+/i, ' & ').replace(/\s+/g, ' ').trim();
+        const conn = gp[2];
+        const near = block.slice(gp.index, Math.min(block.length, gp.index + 220));
+        const voltNear = near.match(/([0-9.]+\s*(?:-\s*[0-9.]+)?)\s*V(?:DC|AC)?/i);
+        const ohmNear = near.match(/([0-9.]+\s*(?:-\s*[0-9.]+)?)\s*(k)?\s*(?:Ω|ohms?)/i);
+        if (voltNear) {
+          addPin(componentName, `${conn} pins ${pinsOnly}`, 'Voltage check', normalizeVoltageValue(voltNear[1].replace(/\s+/g, ' ')));
+        } else if (ohmNear) {
+          addPin(componentName, `${conn} pins ${pinsOnly}`, 'Resistance check', normalizeOhmsValue(ohmNear[0]));
+        }
+      }
+
       // Component specs sentences and temp tables
-      const specResRegex = /Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*Ω)/ig;
+      const specResRegex = /(Resistance|resistance)\s+(?:should\s+be|is|should\s+measure)\s+([0-9.\s\-]+k?\s*(?:Ω|ohms?))/ig;
       let sr;
       while ((sr = specResRegex.exec(block)) !== null) {
-        addSpec(componentName, 'Resistance Spec', 'Room temperature', sr[1].replace(/\s+/g, ' ').trim());
+        addSpec(componentName, 'Resistance Spec', 'Room temperature', normalizeOhmsValue(sr[2]));
       }
       const tempTableRegex = /At\s+([0-9]+)\s*°C[^\.]*?\s*([0-9.]+)\s*(k)?\s*Ω/ig;
       let tt;
@@ -703,10 +981,57 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 3) Build per-code objects (join to referenced TESTs)
+    // 2b) Global extraction outside of TEST blocks (component-only pinouts and tables)
+    const globalPinTests = [];
+    const seenGlobal = new Set();
+    const addGlobalPin = (component, pin, condition, expected) => {
+      if (!component || !pin || !expected) return;
+      const key = `${component}|${pin}|${expected}`.toLowerCase();
+      if (seenGlobal.has(key)) return;
+      seenGlobal.add(key);
+      globalPinTests.push({
+        component: component.trim(),
+        pin: pin.trim().replace(/\s+/g, ' '),
+        condition: (condition || 'Per spec').trim(),
+        expectedValue: expected.trim()
+      });
+    };
+    // Global table rows like "Drain Pump J11-1 to J11-2 18.5 - 21.5 Ω"
+    const globalTableRowRegex = /(^|\n)\s*([A-Za-z][A-Za-z0-9\/\-\s]+?)\s+(J\d+-\d+\s*(?:to|&|and|-)\s*J\d+-\d+)\s+([0-9.]+\s*(?:-\s*[0-9.]+\s*)?(?:k)?\s*(?:Ω|ohms?))/gi;
+    let gtr;
+    while ((gtr = globalTableRowRegex.exec(text)) !== null) {
+      const comp = gtr[2].trim();
+      const pins = gtr[3].trim();
+      const val = gtr[4].trim();
+      addGlobalPin(comp, pins, 'Room temperature check', normalizeOhmsValue(val));
+    }
+    // Global pinout lines with nearby default values
+    const pinLineGlobal = /^\s*([A-Za-z][A-Za-z0-9\/\-\s\(\)#]+?)\s+(J\d+),?\s*pins?\s*([0-9A-Za-z\s&\-]+)\s*$/gmi;
+    let gl;
+    while ((gl = pinLineGlobal.exec(text)) !== null) {
+      const comp = gl[1].trim();
+      const conn = gl[2].trim();
+      const pinsOnly = gl[3].trim().replace(/\s+/g, ' ');
+      const near = text.slice(gl.index, Math.min(text.length, gl.index + 400));
+      const voltNear = near.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+\s*V(?:DC|AC)?)/i) || near.match(/(?:you\s+should\s+)?measure\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?/i);
+      const ohmNear = near.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*(?:Ω|ohms?))/i) || near.match(/([0-9.]+\s*(?:-\s*[0-9.]+)?)\s*(k)?\s*(?:Ω|ohms?)/i);
+      if (voltNear) {
+        addGlobalPin(comp, `${conn} pins ${pinsOnly}`, 'Voltage check', normalizeVoltageValue(voltNear[1]));
+      } else if (ohmNear) {
+        const val = ohmNear[1] ? `${ohmNear[1]}${ohmNear[2] ? 'k ' : ' '}Ω` : ohmNear[0];
+        addGlobalPin(comp, `${conn} pins ${pinsOnly}`, 'Resistance check', normalizeOhmsValue(val));
+      }
+    }
+
+    // 3) Build per-code objects (join to referenced TESTs and related global pins by component name)
     const results = [];
     const uniqCodes = new Set();
     const referencedTests = new Set();
+    const componentToGlobalPins = globalPinTests.reduce((acc, p) => {
+      const key = p.component.toLowerCase();
+      (acc[key] = acc[key] || []).push(p);
+      return acc;
+    }, {});
 
     codeBlocks.forEach(c => {
       const key = c.code;
@@ -722,6 +1047,13 @@ document.addEventListener('DOMContentLoaded', () => {
           componentSpecs.push(...tests[num].componentSpecs);
         }
       });
+      // Heuristic: also merge global pins whose component name appears in the description
+      const descLower = (c.description || '').toLowerCase();
+      Object.keys(componentToGlobalPins).forEach(compKey => {
+        if (compKey && descLower.includes(compKey)) {
+          pinTests.push(...componentToGlobalPins[compKey]);
+        }
+      });
 
       results.push({
         code: c.code,
@@ -734,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // 4) NEW: Add component-only entries for unreferenced TEST blocks
+    // 4) Add component-only entries for unreferenced TEST blocks
     Object.entries(tests).forEach(([numStr, t]) => {
       const num = parseInt(numStr, 10);
       if (referencedTests.has(num)) return; // already linked to a code
@@ -749,6 +1081,18 @@ document.addEventListener('DOMContentLoaded', () => {
         componentSpecs: t.componentSpecs
       });
     });
+    // 4b) Add a global component entry if we found global pin tests
+    if (globalPinTests.length) {
+      results.push({
+        code: 'COMP-GLOBAL: Pinouts and Tables',
+        description: 'Component pinouts and measurement specs discovered outside explicit TEST blocks.',
+        severity: 'Low',
+        source: 'Component Tables/Pinouts',
+        recommendedAction: 'Use for baseline verification or preventive checks.',
+        pinTests: globalPinTests,
+        componentSpecs: []
+      });
+    }
 
     logEvent(`Offline parser produced ${results.length} item(s) including component-only entries.`);
     return results;
@@ -761,41 +1105,43 @@ document.addEventListener('DOMContentLoaded', () => {
       conservative: 'Be extremely strict. Only include items explicitly and unambiguously linked. Do not infer.',
       balanced: 'Prioritize accuracy but allow reasonable context to link items.'
     };
-    return `You are an expert technical document analysis assistant. Your task is to extract diagnostic data from the provided text and structure it as a JSON array. Follow these specific steps and patterns to ensure a comprehensive and accurate result.
-
-1.  **Identify and Process Fault/Error Codes**:
-    * Find all codes, which typically match patterns like 'F#E#' (e.g., F3E1) or standard OBD-II formats (e.g., P1234).
-    * For each code, extract its immediate description.
-    * Look for references to test procedures within the code's description, specifically phrases like "See TEST #N".
-
-2.  **Scan for Component Testing Procedures**:
-    * Find sections or blocks that begin with a pattern like 'TEST #N: [Title]' (e.g., TEST #7: Water Level Sensor). The title often contains the component name.
-    * For each of these test blocks, extract all relevant details for both 'pinTests' and 'componentSpecs'.
-    * **Pin Tests**: Look for phrases and patterns that describe measurements across pins or connectors.
-        * **Patterns**: "measure the [resistance/continuity] across pins [1 and 2] of [connector J3]", or "pins [1 and 3]... you should measure [2.9-3.5 VDC]", or "J11-1 to J11-2 [18.5 - 21.5 Ω]".
-        * **Extract**: The component name (from the title), the pin or connector range (e.g., 'J3 pins 1 and 2'), the condition ('Voltage check', 'Resistance check'), and the expected value ('2.9-3.5 VDC', '18.5-21.5 Ω').
-    * **Component Specs**: Look for phrases that describe the component's specifications or baseline measurements.
-        * **Patterns**: "Resistance should be [value]", or data tables that link a condition to a value, like "At 25°C... 5.5 kΩ".
-        * **Extract**: The component name, the test name ('Resistance Spec', 'Temperature-Resistance'), the condition ('At 25°C', 'Room temperature'), and the expected value.
-
-3.  **Synthesize and Link Data**:
-    * **Join Data**: For each fault code identified in step 1, add the `pinTests` and `componentSpecs` from any 'TEST #' procedure that was referenced by that code.
-    * **Handle Unreferenced Tests**: For any 'TEST #' block that was **not** referenced by a fault code, create a separate entry in the output array.
-        * The `code` should be a synthetic value like "COMP-<N>: <Title>".
-        * The `description` should indicate it's for baseline checks.
-        * Set the `severity` to "Low".
-        * Set the `source` to "Component Testing".
-        * Set the `recommendedAction` to "Use for baseline verification or preventive checks.".
-        * Include all `pinTests` and `componentSpecs` harvested from that test block.
-
-4.  **Final Output**: Return a single, valid JSON array that strictly matches the MDCS schema. Do not include any text before or after the JSON.
-
-STRICTNESS MODE: ${strictness[safetyMode]}
-
-TEXT TO ANALYZE:
----
-${text}
----`;
+    return [
+      'You are an expert technical document analysis assistant. Your task is to extract diagnostic data from the provided text and structure it as a JSON array. Follow these specific steps and patterns to ensure a comprehensive and accurate result.',
+      '',
+      '1.  **Identify and Process Fault/Error Codes**:',
+      "    * Find all codes, which typically match patterns like 'F#E#' (e.g., F3E1) or standard OBD-II formats (e.g., P1234).",
+      '    * For each code, extract its immediate description.',
+      "    * Look for references to test procedures within the code's description, specifically phrases like 'See TEST #N'.",
+      '',
+      '2.  **Scan for Component Testing Procedures**:',
+      "    * Find sections or blocks that begin with a pattern like 'TEST #N: [Title]' (e.g., TEST #7: Water Level Sensor). The title often contains the component name.",
+      "    * For each of these test blocks, extract all relevant details for both 'pinTests' and 'componentSpecs'.",
+      '    * **Pin Tests**: Look for phrases and patterns that describe measurements across pins or connectors.',
+      "        * **Patterns**: 'measure the [resistance/continuity] across pins [1 and 2] of [connector J3]', or 'pins [1 and 3]... you should measure [2.9-3.5 VDC]', or 'J11-1 to J11-2 [18.5 - 21.5 Ω]'.",
+      "        * **Extract**: The component name (from the title), the pin or connector range (e.g., 'J3 pins 1 and 2'), the condition ('Voltage check', 'Resistance check'), and the expected value ('2.9-3.5 VDC', '18.5-21.5 Ω').",
+      "    * **Component Specs**: Look for phrases that describe the component's specifications or baseline measurements.",
+      "        * **Patterns**: 'Resistance should be [value]', or data tables that link a condition to a value, like 'At 25°C... 5.5 kΩ'.",
+      "        * **Extract**: The component name, the test name ('Resistance Spec', 'Temperature-Resistance'), the condition ('At 25°C', 'Room temperature'), and the expected value.",
+      '',
+      '3.  **Synthesize and Link Data**:',
+      "    * **Join Data**: For each fault code identified in step 1, add the `pinTests` and `componentSpecs` from any 'TEST #' procedure that was referenced by that code.",
+      "    * **Handle Unreferenced Tests**: For any 'TEST #' block that was **not** referenced by a fault code, create a separate entry in the output array.",
+      "        * The `code` should be a synthetic value like 'COMP-<N>: <Title>'.",
+      "        * The `description` should indicate it's for baseline checks.",
+      "        * Set the `severity` to 'Low'.",
+      "        * Set the `source` to 'Component Testing'.",
+      "        * Set the `recommendedAction` to 'Use for baseline verification or preventive checks.'.",
+      "        * Include all `pinTests` and `componentSpecs` harvested from that test block.",
+      '',
+      '4.  **Final Output**: Return a single, valid JSON array that strictly matches the MDCS schema. Do not include any text before or after the JSON.',
+      '',
+      `STRICTNESS MODE: ${strictness[safetyMode]}`,
+      '',
+      'TEXT TO ANALYZE:',
+      '---',
+      text,
+      '---'
+    ].join('\n');
   };
 
   const callApiWithRetry = async (apiCallFunction, apiName, retries = 3, delay = 1000) => {
@@ -855,15 +1201,40 @@ ${text}
     return normalizeToArray(tryParseJSONLoose(content));
   }, 'OpenAI');
 
+  const callClientAPI = (text) => callApiWithRetry(async () => {
+    const res = await fetch('/api/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, safety: safetySelect.value })
+    });
+    if (!res.ok) { const body = await res.text(); throw new Error(`Client API failed: ${res.status} ${body}`); }
+    const json = await res.json();
+    return normalizeToArray(json);
+  }, 'Client');
+
+  const callCustomAPI = (text) => callApiWithRetry(async () => {
+    const url = endpointInput.value?.trim();
+    if (!url) throw new Error('Custom endpoint URL is required.');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, safety: safetySelect.value })
+    });
+    if (!res.ok) { const body = await res.text(); throw new Error(`Custom API failed: ${res.status} ${body}`); }
+    const json = await res.json();
+    return normalizeToArray(json);
+  }, 'Custom');
+
   // --- Main Pipeline ---
   const processText = async (text) => {
     currentFileText = text;
     const mode = modeSelect.value;
     logEvent(`Processing text using mode: ${mode}`);
-    if (['offline', 'ocr'].includes(mode) || (mode === 'free_tier' && !currentFileText)) {
+    if (['offline', 'ocr', 'free_tier'].includes(mode)) {
       setLoading(true, "Running offline parser…");
       await new Promise(r => setTimeout(r, 30));
       const offlineData = parseOffline(currentFileText);
+      try { updateMemoryWithResults(offlineData); } catch (e) { logError('Memory update failed', e?.message); }
       renderResults(offlineData);
       setLoading(false);
       return;
@@ -872,30 +1243,46 @@ ${text}
     // Check for API keys before making the call
     if (mode === 'gemini' && !geminiApiKeyInput.value.trim()) {
         showMessage('Please enter your Gemini API key to use this mode.', 'error');
+        endpointSettings.classList.remove('hidden');
+        geminiApiKeyLabel.classList.remove('hidden');
+        setTimeout(() => geminiApiKeyInput.focus(), 0);
         setLoading(false);
         return;
     }
     if (mode === 'openai' && !openaiApiKeyInput.value.trim()) {
         showMessage('Please enter your OpenAI API key to use this mode.', 'error');
+        endpointSettings.classList.remove('hidden');
+        openaiApiKeyLabel.classList.remove('hidden');
+        setTimeout(() => openaiApiKeyInput.focus(), 0);
         setLoading(false);
         return;
     }
     
     try {
-      setLoading(true, `Analyzing with ${mode === 'gemini' ? 'Gemini' : 'OpenAI'}...`);
-      const results = (mode === 'gemini') ? await callGeminiAPI(currentFileText) : await callOpenAIAPI(currentFileText);
+      setLoading(true, `Analyzing with ${mode === 'gemini' ? 'Gemini' : mode === 'openai' ? 'OpenAI' : mode === 'client' ? 'Client API' : 'Custom API'}...`);
+      let results = [];
+      if (mode === 'gemini') results = await callGeminiAPI(currentFileText);
+      else if (mode === 'openai') results = await callOpenAIAPI(currentFileText);
+      else if (mode === 'client') results = await callClientAPI(currentFileText);
+      else if (mode === 'custom') results = await callCustomAPI(currentFileText);
       
       if (!Array.isArray(results) || results.length === 0) {
         showMessage('AI analysis returned no data. Falling back to offline parser.', 'warn');
         logEvent('AI returned empty payload; running offline parser as fallback.', 'WARN');
         const offlineData = parseOffline(currentFileText);
+        try { updateMemoryWithResults(offlineData); } catch (e) { logError('Memory update failed', e?.message); }
         renderResults(offlineData);
       } else {
-        renderResults(results);
+        // Enrich AI results using offline extraction for pin tests/specs/global pinouts
+        const offlineData = parseOffline(currentFileText);
+        const enriched = enrichResultsWithOffline(results, offlineData);
+        try { updateMemoryWithResults(enriched); } catch (e) { logError('Memory update failed', e?.message); }
+        renderResults(enriched);
       }
     } catch (error) {
       showMessage(`Analysis failed: ${error.message}. You can try the "Offline" mode.`, 'error');
       logEvent(`Analysis failed (${mode}): ${error.message}`, 'ERROR');
+      logError('Analysis failed', error?.message || String(error));
       forceOfflineBtn.classList.remove('hidden');
     } finally {
       setLoading(false);
@@ -930,6 +1317,7 @@ ${text}
           throw new Error('No text could be extracted. For scanned PDFs or images, ensure the "Offline + OCR" mode is selected.');
       }
       await processText(text);
+      if (retryBtn) retryBtn.disabled = false;
     } catch (err) {
       showMessage(`Error processing file: ${err.message}`, 'error');
       logEvent(`File processing failed: ${err.message}`, 'ERROR');
@@ -947,9 +1335,87 @@ ${text}
     logEvent(`Switched mode to: ${mode}`);
     // Clear the force offline button
     forceOfflineBtn.classList.add('hidden');
+    if (mode === 'gemini' && !geminiApiKeyInput.value.trim()) {
+      setTimeout(() => geminiApiKeyInput.focus(), 0);
+    }
+    if (mode === 'openai' && !openaiApiKeyInput.value.trim()) {
+      setTimeout(() => openaiApiKeyInput.focus(), 0);
+    }
   });
   openFileBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+  if (retryBtn) {
+    retryBtn.addEventListener('click', async () => {
+      if (!currentFileText || !currentFileText.trim()) {
+        showMessage('No document loaded to retry.', 'warn');
+        return;
+      }
+      logEvent('Retrying analysis on current text.');
+      await processText(currentFileText);
+    });
+  }
+  // API Settings button
+  if (apiSettingsBtn) {
+    apiSettingsBtn.addEventListener('click', () => {
+      endpointSettings.classList.remove('hidden');
+      modeSelect.value = 'gemini';
+      modeSelect.dispatchEvent(new Event('change'));
+      setTimeout(() => geminiApiKeyInput.focus(), 0);
+      logEvent('API Settings opened (switched to Gemini).');
+    });
+  }
+
+  // Error log controls and view toggle
+  if (viewErrorsBtn) {
+    viewErrorsBtn.addEventListener('click', () => {
+      renderErrorLog();
+      errorLogSection.classList.toggle('hidden');
+    });
+  }
+  if (exportErrorsBtn) {
+    exportErrorsBtn.addEventListener('click', () => {
+      if (!errorLog.length) return;
+      downloadFile(JSON.stringify(errorLog, null, 2), 'errors.json', 'application/json');
+    });
+  }
+  if (clearErrorsBtn) {
+    clearErrorsBtn.addEventListener('click', () => {
+      errorLog = [];
+      saveJSON('diagErrorLog', errorLog);
+      renderErrorLog();
+    });
+  }
+
+  // Memory controls and view toggle
+  if (viewMemoryBtn) {
+    viewMemoryBtn.addEventListener('click', () => {
+      renderMemoryInsights();
+      memorySection.classList.toggle('hidden');
+    });
+  }
+  if (exportMemoryBtn) {
+    exportMemoryBtn.addEventListener('click', () => {
+      downloadFile(JSON.stringify(diagMemory, null, 2), 'diagnostic-memory.json', 'application/json');
+    });
+  }
+  if (clearMemoryBtn) {
+    clearMemoryBtn.addEventListener('click', () => {
+      diagMemory = { codes: {} };
+      saveJSON('diagMemory', diagMemory);
+      renderMemoryInsights();
+    });
+  }
+
+  // Persist API keys and endpoint
+  if (geminiApiKeyInput) {
+    geminiApiKeyInput.addEventListener('input', () => saveSetting('geminiApiKey', geminiApiKeyInput.value));
+  }
+  if (openaiApiKeyInput) {
+    openaiApiKeyInput.addEventListener('input', () => saveSetting('openaiApiKey', openaiApiKeyInput.value));
+  }
+  if (endpointInput) {
+    endpointInput.addEventListener('input', () => saveSetting('customEndpoint', endpointInput.value));
+  }
 
   sampleBtn.addEventListener('click', () => {
     logEvent('Loading sample diagnostic text.');
@@ -1060,6 +1526,13 @@ Resistance should be 1.1 - 1.35k Ω.
 
   // Init
   const init = () => {
+    // Load saved API settings
+    geminiApiKeyInput.value = getSetting('geminiApiKey');
+    openaiApiKeyInput.value = getSetting('openaiApiKey');
+    endpointInput.value = getSetting('customEndpoint');
+    // Initialize error/memory UIs from storage
+    renderErrorLog();
+    renderMemoryInsights();
     schemaContent.textContent = JSON.stringify(MDCS_SCHEMA, null, 2);
     const schemaString = JSON.stringify(MDCS_SCHEMA);
     let hash = 0;
