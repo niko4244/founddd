@@ -601,6 +601,89 @@ document.addEventListener('DOMContentLoaded', () => {
     return [];
   };
 
+  // --- Normalization & Enrichment Helpers ---
+  const normalizeOhmsValueGlobal = (val) => {
+    if (!val) return '';
+    return String(val)
+      .replace(/\s+/g, ' ')
+      .replace(/k\s*(?:ohm|Ω)/ig, 'k Ω')
+      .replace(/ohms?/ig, 'Ω')
+      .replace(/Ω/g, 'Ω')
+      .trim();
+  };
+  const normalizeVoltageValueGlobal = (val) => {
+    if (!val) return '';
+    const cleaned = String(val).replace(/\s+/g, ' ').trim();
+    if (/v\s*(dc|ac)/i.test(cleaned)) return cleaned.toUpperCase().replace(/\s+/g, ' ');
+    if (/v$/i.test(cleaned)) return cleaned.toUpperCase();
+    return cleaned + ' V';
+  };
+  const normalizeExpectedValue = (val) => {
+    if (!val) return '';
+    const s = String(val);
+    if (/(Ω|ohm)/i.test(s)) return normalizeOhmsValueGlobal(s);
+    if (/\bV\b|VDC|VAC/i.test(s)) return normalizeVoltageValueGlobal(s);
+    return s.trim();
+  };
+  const dedupeByKey = (arr, keyFn) => {
+    const seen = new Set();
+    const out = [];
+    (arr || []).forEach(it => {
+      const k = keyFn(it);
+      if (k && !seen.has(k)) { seen.add(k); out.push(it); }
+    });
+    return out;
+  };
+  const enrichResultsWithOffline = (aiResults, offlineData) => {
+    const results = Array.isArray(aiResults) ? JSON.parse(JSON.stringify(aiResults)) : [];
+    const offline = Array.isArray(offlineData) ? offlineData : [];
+    const byCode = new Map();
+    results.forEach(r => { if (r && r.code) byCode.set(r.code, r); });
+    const globalEntry = offline.find(o => typeof o.code === 'string' && o.code.startsWith('COMP-GLOBAL')) || null;
+    const globalPins = (globalEntry && Array.isArray(globalEntry.pinTests)) ? globalEntry.pinTests : [];
+    const componentToGlobalPins = globalPins.reduce((acc, p) => {
+      const key = (p.component || '').toLowerCase();
+      (acc[key] = acc[key] || []).push(p);
+      return acc;
+    }, {});
+
+    // Merge per-code from offline
+    results.forEach(item => {
+      const off = offline.find(o => o.code === item.code);
+      const mergedPins = [...(item.pinTests || []), ...((off && off.pinTests) || [])];
+      const mergedSpecs = [...(item.componentSpecs || []), ...((off && off.componentSpecs) || [])];
+      // Heuristic: attach global pins if component name appears in description
+      const descLower = (item.description || '').toLowerCase();
+      Object.keys(componentToGlobalPins).forEach(compKey => {
+        if (compKey && descLower.includes(compKey)) {
+          mergedPins.push(...componentToGlobalPins[compKey]);
+        }
+      });
+      // Normalize and dedupe
+      item.pinTests = dedupeByKey(mergedPins.map(p => ({
+        component: p.component,
+        pin: p.pin,
+        condition: p.condition,
+        expectedValue: normalizeExpectedValue(p.expectedValue)
+      })), t => `${(t.component||'').toLowerCase()}|${(t.pin||'').toLowerCase()}|${(t.condition||'').toLowerCase()}|${(t.expectedValue||'').toLowerCase()}`);
+      item.componentSpecs = dedupeByKey(mergedSpecs.map(s => ({
+        component: s.component,
+        testName: s.testName,
+        condition: s.condition,
+        expectedValue: normalizeExpectedValue(s.expectedValue)
+      })), t => `${(t.component||'').toLowerCase()}|${(t.testName||'').toLowerCase()}|${(t.condition||'').toLowerCase()}|${(t.expectedValue||'').toLowerCase()}`);
+    });
+
+    // Append offline items not present in AI output (component-only and global)
+    offline.forEach(off => {
+      if (!byCode.has(off.code)) {
+        results.push(off);
+      }
+    });
+
+    return results;
+  };
+
   // --- Rendering ---
   const renderResults = (data) => {
     if (!data || !data.length) {
@@ -1190,8 +1273,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try { updateMemoryWithResults(offlineData); } catch (e) { logError('Memory update failed', e?.message); }
         renderResults(offlineData);
       } else {
-        try { updateMemoryWithResults(results); } catch (e) { logError('Memory update failed', e?.message); }
-        renderResults(results);
+        // Enrich AI results using offline extraction for pin tests/specs/global pinouts
+        const offlineData = parseOffline(currentFileText);
+        const enriched = enrichResultsWithOffline(results, offlineData);
+        try { updateMemoryWithResults(enriched); } catch (e) { logError('Memory update failed', e?.message); }
+        renderResults(enriched);
       }
     } catch (error) {
       showMessage(`Analysis failed: ${error.message}. You can try the "Offline" mode.`, 'error');
