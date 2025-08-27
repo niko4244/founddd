@@ -898,10 +898,57 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 3) Build per-code objects (join to referenced TESTs)
+    // 2b) Global extraction outside of TEST blocks (component-only pinouts and tables)
+    const globalPinTests = [];
+    const seenGlobal = new Set();
+    const addGlobalPin = (component, pin, condition, expected) => {
+      if (!component || !pin || !expected) return;
+      const key = `${component}|${pin}|${expected}`.toLowerCase();
+      if (seenGlobal.has(key)) return;
+      seenGlobal.add(key);
+      globalPinTests.push({
+        component: component.trim(),
+        pin: pin.trim().replace(/\s+/g, ' '),
+        condition: (condition || 'Per spec').trim(),
+        expectedValue: expected.trim()
+      });
+    };
+    // Global table rows like "Drain Pump J11-1 to J11-2 18.5 - 21.5 Ω"
+    const globalTableRowRegex = /(^|\n)\s*([A-Za-z][A-Za-z0-9\/\-\s]+?)\s+(J\d+-\d+\s*(?:to|&|and|-)\s*J\d+-\d+)\s+([0-9.]+\s*(?:-\s*[0-9.]+\s*)?(?:k)?\s*(?:Ω|ohms?))/gi;
+    let gtr;
+    while ((gtr = globalTableRowRegex.exec(text)) !== null) {
+      const comp = gtr[2].trim();
+      const pins = gtr[3].trim();
+      const val = gtr[4].trim();
+      addGlobalPin(comp, pins, 'Room temperature check', normalizeOhmsValue(val));
+    }
+    // Global pinout lines with nearby default values
+    const pinLineGlobal = /^\s*([A-Za-z][A-Za-z0-9\/\-\s\(\)#]+?)\s+(J\d+),?\s*pins?\s*([0-9A-Za-z\s&\-]+)\s*$/gmi;
+    let gl;
+    while ((gl = pinLineGlobal.exec(text)) !== null) {
+      const comp = gl[1].trim();
+      const conn = gl[2].trim();
+      const pinsOnly = gl[3].trim().replace(/\s+/g, ' ');
+      const near = text.slice(gl.index, Math.min(text.length, gl.index + 400));
+      const voltNear = near.match(/Voltage\s+should\s+be\s+([0-9.\s\-]+\s*V(?:DC|AC)?)/i) || near.match(/(?:you\s+should\s+)?measure\s*([0-9.\s\-to]+)\s*V(?:DC|AC)?/i);
+      const ohmNear = near.match(/Resistance\s+should\s+be\s+([0-9.\s\-]+k?\s*(?:Ω|ohms?))/i) || near.match(/([0-9.]+\s*(?:-\s*[0-9.]+)?)\s*(k)?\s*(?:Ω|ohms?)/i);
+      if (voltNear) {
+        addGlobalPin(comp, `${conn} pins ${pinsOnly}`, 'Voltage check', normalizeVoltageValue(voltNear[1]));
+      } else if (ohmNear) {
+        const val = ohmNear[1] ? `${ohmNear[1]}${ohmNear[2] ? 'k ' : ' '}Ω` : ohmNear[0];
+        addGlobalPin(comp, `${conn} pins ${pinsOnly}`, 'Resistance check', normalizeOhmsValue(val));
+      }
+    }
+
+    // 3) Build per-code objects (join to referenced TESTs and related global pins by component name)
     const results = [];
     const uniqCodes = new Set();
     const referencedTests = new Set();
+    const componentToGlobalPins = globalPinTests.reduce((acc, p) => {
+      const key = p.component.toLowerCase();
+      (acc[key] = acc[key] || []).push(p);
+      return acc;
+    }, {});
 
     codeBlocks.forEach(c => {
       const key = c.code;
@@ -917,6 +964,13 @@ document.addEventListener('DOMContentLoaded', () => {
           componentSpecs.push(...tests[num].componentSpecs);
         }
       });
+      // Heuristic: also merge global pins whose component name appears in the description
+      const descLower = (c.description || '').toLowerCase();
+      Object.keys(componentToGlobalPins).forEach(compKey => {
+        if (compKey && descLower.includes(compKey)) {
+          pinTests.push(...componentToGlobalPins[compKey]);
+        }
+      });
 
       results.push({
         code: c.code,
@@ -929,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // 4) NEW: Add component-only entries for unreferenced TEST blocks
+    // 4) Add component-only entries for unreferenced TEST blocks
     Object.entries(tests).forEach(([numStr, t]) => {
       const num = parseInt(numStr, 10);
       if (referencedTests.has(num)) return; // already linked to a code
@@ -944,6 +998,18 @@ document.addEventListener('DOMContentLoaded', () => {
         componentSpecs: t.componentSpecs
       });
     });
+    // 4b) Add a global component entry if we found global pin tests
+    if (globalPinTests.length) {
+      results.push({
+        code: 'COMP-GLOBAL: Pinouts and Tables',
+        description: 'Component pinouts and measurement specs discovered outside explicit TEST blocks.',
+        severity: 'Low',
+        source: 'Component Tables/Pinouts',
+        recommendedAction: 'Use for baseline verification or preventive checks.',
+        pinTests: globalPinTests,
+        componentSpecs: []
+      });
+    }
 
     logEvent(`Offline parser produced ${results.length} item(s) including component-only entries.`);
     return results;
