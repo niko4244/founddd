@@ -1,0 +1,2666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tech Tool Suite v10.1</title>
+<script>
+  const _t = localStorage.getItem('tts_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', _t);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   MATTE CHARCOAL DESIGN TOKENS
+═══════════════════════════════════════════════ */
+:root {
+  /* ── Functional colors ── */
+  --cobalt:    #3a7bd5;       /* primary action — START */
+  --cobalt-hi: #5a9bf5;
+  --cobalt-dk: #2a5ba5;
+  --forest:    #2e7d52;       /* active / mic live */
+  --forest-hi: #4caf78;
+  --amber:     #d4851a;       /* warning / attention */
+  --amber-hi:  #f0a030;
+  --rose:      #c0404a;       /* danger / stop */
+  --rose-hi:   #e05560;
+  --slate:     #8a9bac;       /* secondary text */
+  --violet:    #7060b8;       /* accent / case lib */
+
+  /* ── Backgrounds — matte charcoal depth system ── */
+  --bg:        #1a1d21;       /* page base */
+  --panel:     #20242a;       /* card surface */
+  --panel2:    #252a32;       /* elevated card */
+  --panel3:    #2c323c;       /* hover / selected */
+  --input-bg:  #161920;       /* inset / inputs */
+  --overlay:   rgba(10,12,16,0.95);
+
+  /* ── Borders — depth not glow ── */
+  --border:    #2a2f38;
+  --border2:   #333a46;
+  --border3:   #3e4755;
+
+  /* ── Text — off-white, never pure white ── */
+  --text:      #dde3ea;       /* primary — soft off-white */
+  --text2:     #8a9bac;       /* secondary */
+  --muted:     #4e5a68;       /* disabled / placeholder */
+  --dim:       #3a4250;
+
+  /* ── Typography ── */
+  --font-hd:   'Rajdhani', 'Inter', sans-serif;
+  --font-bd:   'Inter', sans-serif;
+  --mono:      'JetBrains Mono', 'Courier New', monospace;
+
+  /* ── Subtle glows — tight, functional only ── */
+  --glow-c:    0 0 0 1px rgba(58,123,213,0.4);
+  --glow-g:    0 0 0 1px rgba(46,125,82,0.4);
+  --glow-y:    0 0 0 1px rgba(212,133,26,0.4);
+
+  --radius:    4px;
+  --radius-lg: 6px;
+  --sidebar-w: 52px;
+  --sidebar-w-open: 200px;
+  --header-h: 52px;
+}
+[data-theme="light"] {
+  --bg:      #1a1d21;
+  --panel:   #20242a;
+}
+
+/* ═══════════════════════════════════════════════
+   RESET
+═══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 13px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-bd);
+  font-size: 1rem;
+  margin: 0;
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 400;
+}
+/* remove scanline and vignette overlays */
+body::before, body::after { display: none; }
+
+/* ═══════════════════════════════════════════════
+   SCANLINE OVERLAY
+═══════════════════════════════════════════════ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.13) 2px,
+    rgba(0,0,0,0.13) 4px
+  );
+  pointer-events: none;
+  z-index: 9000;
+}
+/* CRT vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.38) 100%);
+  pointer-events: none;
+  z-index: 9001;
+}
+
+/* ═══════════════════════════════════════════════
+   TICKER TAPE
+═══════════════════════════════════════════════ */
+#ticker {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background: var(--panel);
+  border-top: 1px solid var(--border2);
+  overflow: hidden;
+  z-index: 8999;
+  display: flex;
+  align-items: center;
+}
+#ticker-inner {
+  display: inline-block;
+  white-space: nowrap;
+  animation: ticker-scroll 40s linear infinite;
+  font-family: var(--font-bd);
+  font-size: .8rem;
+  color: var(--text2);
+  padding-left: 100%;
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════ */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6px;
+  z-index: 50;
+  transition: width .18s ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+#sidebar:hover { width: var(--sidebar-w-open); }
+#sidebar:hover .nav-label { display: inline; opacity: 1; }
+
+.nav-item {
+  width: 100%;
+  padding: 11px 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: color .12s, background .12s;
+  white-space: nowrap;
+  overflow: hidden;
+  border-left: 3px solid transparent;
+  font-family: var(--font-bd);
+  font-size: .82rem;
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+.nav-item:hover {
+  color: var(--text);
+  background: var(--panel2);
+  border-left-color: var(--cobalt-hi);
+}
+.nav-item.active {
+  color: var(--text);
+  background: var(--panel3);
+  border-left-color: var(--cobalt);
+}
+.nav-icon {
+  min-width: var(--sidebar-w);
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+.nav-label {
+  display: none;
+  opacity: 0;
+  transition: opacity .15s;
+  font-size: .78rem;
+  font-weight: 500;
+  letter-spacing: .03em;
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════ */
+#main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+  padding-bottom: 22px;
+}
+
+/* ═══════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════ */
+header {
+  height: var(--header-h);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+}
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.brand-name {
+  font-family: var(--font-hd);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 3px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.brand-version {
+  font-family: var(--mono);
+  font-size: .7rem;
+  color: var(--muted);
+  background: var(--panel2);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border2);
+}
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════
+   TIMERS
+═══════════════════════════════════════════════ */
+.timer-group {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border2);
+  background: var(--input-bg);
+  border-radius: var(--radius);
+}
+.timer-group:hover { border-color: var(--border3); }
+.timer-item {
+  text-align: center;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background .1s;
+  border-right: 1px solid var(--border2);
+}
+.timer-item:last-child { border-right: none; }
+.timer-item:hover { background: var(--panel2); }
+.timer-label {
+  font-family: var(--font-bd);
+  font-size: .58rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: .1em;
+}
+.timer-value {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: .06em;
+  color: var(--text);
+}
+
+/* ═══════════════════════════════════════════════
+   CALL COUNTER
+═══════════════════════════════════════════════ */
+.call-counter {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border2);
+  background: var(--input-bg);
+  border-radius: var(--radius);
+}
+.counter-btn {
+  width: 24px;
+  padding: 4px 0;
+  border: none;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 1rem;
+  transition: background .1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+.counter-btn.dec { color: var(--rose-hi); }
+.counter-btn.inc { color: var(--forest-hi); }
+.counter-btn:hover { background: var(--panel2); }
+.counter-mid {
+  padding: 4px 10px;
+  cursor: pointer;
+  text-align: center;
+  border-left: 1px solid var(--border2);
+  border-right: 1px solid var(--border2);
+  font-family: var(--mono);
+  font-weight: 500;
+}
+
+#clock {
+  font-family: var(--mono);
+  font-size: .9rem;
+  color: var(--text2);
+  letter-spacing: .06em;
+}
+
+/* ═══════════════════════════════════════════════
+   ENV BADGE
+═══════════════════════════════════════════════ */
+.env-badge {
+  font-family: var(--mono);
+  font-size: .65rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border: 1px solid var(--border2);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: var(--input-bg);
+  border-radius: var(--radius);
+}
+.env-claude     { color: var(--cobalt-hi); border-color: var(--cobalt); background: rgba(58,123,213,0.1); }
+.env-gemini     { color: #a080e0;          border-color: #7060b8;       background: rgba(112,96,184,0.1); }
+.env-standalone { color: var(--amber-hi);  border-color: var(--amber);  background: rgba(212,133,26,0.1); }
+
+#envForceSelect {
+  font-family: var(--mono);
+  font-size: .65rem;
+  background: var(--input-bg);
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ═══════════════════════════════════════════════
+   WORK AREA
+═══════════════════════════════════════════════ */
+#workArea {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  background: var(--border);
+  gap: 1px;
+}
+#leftPanel {
+  width: 50%;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+#rightPanel {
+  width: 50%;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+/* ═══════════════════════════════════════════════
+   PANEL SECTIONS — depth, not glow
+═══════════════════════════════════════════════ */
+.panel-section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  position: relative;
+}
+.panel-section::before { display: none; }
+
+.section-header {
+  font-family: var(--font-hd);
+  font-size: .82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text2);
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ═══════════════════════════════════════════════
+   INPUTS
+═══════════════════════════════════════════════ */
+textarea, .smart-input {
+  width: 100%;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  font-family: var(--mono);
+  font-size: .9rem;
+  font-weight: 400;
+  line-height: 1.6;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  outline: none;
+  transition: border-color .15s;
+  resize: vertical;
+  border-radius: var(--radius);
+}
+textarea:focus, .smart-input:focus {
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 2px rgba(58,123,213,0.2);
+}
+textarea::placeholder, .smart-input::placeholder {
+  color: var(--dim);
+  font-style: normal;
+}
+
+/* ═══════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════ */
+.btn {
+  border: 1px solid var(--border2);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: var(--font-bd);
+  font-size: .78rem;
+  font-weight: 500;
+  letter-spacing: .03em;
+  transition: all .12s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  background: var(--panel2);
+  color: var(--text2);
+  border-radius: var(--radius);
+  text-transform: uppercase;
+}
+.btn:hover { background: var(--panel3); color: var(--text); border-color: var(--border3); }
+.btn:active { transform: scale(.97); }
+
+.btn-primary  { color: var(--cobalt-hi);  border-color: var(--cobalt);  background: rgba(58,123,213,0.12); }
+.btn-primary:hover  { background: rgba(58,123,213,0.22); color: #fff; }
+.btn-danger   { color: var(--rose-hi);    border-color: var(--rose);    background: rgba(192,64,74,0.12); }
+.btn-danger:hover   { background: rgba(192,64,74,0.22); color: #fff; }
+.btn-success  { color: var(--forest-hi);  border-color: var(--forest);  background: rgba(46,125,82,0.12); }
+.btn-success:hover  { background: rgba(46,125,82,0.22); color: #fff; }
+.btn-warn     { color: var(--amber-hi);   border-color: var(--amber);   background: rgba(212,133,26,0.12); }
+.btn-warn:hover     { background: rgba(212,133,26,0.22); color: #fff; }
+.btn-ghost    { color: var(--muted);      border-color: var(--border2); background: transparent; }
+.btn-ghost:hover    { color: var(--text); background: var(--panel2); }
+
+/* START button — solid cobalt */
+#btnRecord {
+  background: var(--cobalt) !important;
+  color: #fff !important;
+  border-color: var(--cobalt-dk) !important;
+  font-weight: 600 !important;
+  letter-spacing: .05em !important;
+}
+#btnRecord:hover { background: var(--cobalt-hi) !important; }
+.btn-record {
+  background: var(--rose) !important;
+  color: #fff !important;
+  border-color: var(--rose-hi) !important;
+  font-weight: 600 !important;
+}
+
+/* ═══════════════════════════════════════════════
+   GENERATE BUTTON
+═══════════════════════════════════════════════ */
+#btnGenerate {
+  width: 100%;
+  padding: 12px 18px;
+  font-family: var(--font-hd);
+  font-size: .9rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--cobalt);
+  border: 1px solid var(--cobalt-dk);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .12s;
+}
+#btnGenerate::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  animation: shimmer 2.8s infinite;
+}
+#btnGenerate:hover { background: var(--cobalt-hi); }
+@keyframes shimmer {
+  from { left: -100%; }
+  to   { left: 200%; }
+}
+
+/* ═══════════════════════════════════════════════
+   NOTE SECTION ACCORDIONS
+═══════════════════════════════════════════════ */
+.note-section-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 5px;
+  overflow: hidden;
+}
+.note-section-header {
+  background: var(--panel2);
+  padding: 9px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-hd);
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  transition: color .1s, background .1s;
+  user-select: none;
+}
+.note-section-header:hover { color: var(--text); background: var(--panel3); }
+.note-section-header::after {
+  content: '▼';
+  font-size: .65rem;
+  color: var(--muted);
+  transition: transform .15s, color .15s;
+}
+.note-section-group.active .note-section-header::after {
+  transform: rotate(180deg);
+  color: var(--cobalt-hi);
+}
+.note-section-content {
+  padding: 8px;
+  background: var(--panel);
+  display: none;
+}
+.note-section-group.active .note-section-content { display: block; }
+.note-section-group.active .note-section-header {
+  color: var(--text);
+  background: var(--panel3);
+  border-bottom: 1px solid var(--border2);
+}
+
+/* ═══════════════════════════════════════════════
+   NOTE BUILDER TOOLBAR — clean pills
+═══════════════════════════════════════════════ */
+.quick-toolbar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+  flex-wrap: wrap;
+}
+.quick-toolbar::-webkit-scrollbar { display: none; }
+.tool-btn {
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: .72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all .1s;
+  cursor: pointer;
+  letter-spacing: .02em;
+  border-radius: 20px;
+}
+.tool-btn:hover {
+  border-color: var(--cobalt);
+  color: var(--cobalt-hi);
+  background: rgba(58,123,213,0.1);
+}
+
+/* ═══════════════════════════════════════════════
+   CASE CARDS
+═══════════════════════════════════════════════ */
+.case-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  transition: all .12s;
+  font-family: var(--font-bd);
+}
+.case-card:hover {
+  border-color: var(--border3);
+  border-left-color: var(--cobalt);
+  background: var(--panel2);
+}
+.case-card.type-catalog   { border-left-color: var(--forest); }
+.case-card.type-knowledge { border-left-color: var(--amber); }
+.case-card.type-history   { border-left-color: var(--violet); }
+
+.filter-pill {
+  padding: 3px 10px;
+  font-family: var(--font-bd);
+  font-size: .72rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--panel2);
+  color: var(--muted);
+  transition: all .1s;
+  letter-spacing: .03em;
+  border-radius: 20px;
+}
+.filter-pill:hover { color: var(--text); border-color: var(--border3); }
+.filter-pill.active {
+  background: rgba(58,123,213,0.15);
+  color: var(--cobalt-hi);
+  border-color: var(--cobalt);
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-bd);
+  font-size: .82rem;
+  transition: background .1s;
+}
+.shortcut-row:hover { background: var(--panel2); }
+.shortcut-row:last-child { border-bottom: none; }
+.row-btn {
+  font-family: var(--font-bd);
+  font-size: .65rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  letter-spacing: .03em;
+  transition: all .1s;
+  border-radius: var(--radius);
+}
+.row-btn:hover { color: var(--text); border-color: var(--border3); background: var(--panel2); }
+
+/* ═══════════════════════════════════════════════
+   AUDIO
+═══════════════════════════════════════════════ */
+.audio-mode-btn {
+  flex: 1;
+  padding: 5px 10px;
+  border: 1px solid var(--border2);
+  background: var(--panel2);
+  color: var(--muted);
+  font-family: var(--font-bd);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .04em;
+  cursor: pointer;
+  text-align: center;
+  transition: all .12s;
+  border-radius: var(--radius);
+}
+.audio-mode-btn.active {
+  border-color: var(--forest);
+  color: var(--forest-hi);
+  background: rgba(46,125,82,0.15);
+  font-weight: 600;
+}
+.audio-mode-btn:hover:not(.active) { color: var(--text); border-color: var(--border3); background: var(--panel3); }
+
+.ch-dot { width: 7px; height: 7px; background: var(--border2); flex-shrink: 0; }
+.ch-dot.on { animation: dotPulse .8s infinite; }
+.interim-bar {
+  font-family: var(--font-bd);
+  font-size: .8rem;
+  color: var(--amber-hi);
+  
+  padding: 2px 8px;
+  border-left: 2px solid var(--amber);
+  margin: 3px 0;
+  min-height: 18px;
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════
+   REGEN BAR
+═══════════════════════════════════════════════ */
+#regenBar {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  padding: 5px 7px;
+  margin-bottom: 7px;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ═══════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════ */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+}
+.modal.visible { display: flex !important; animation: fadeIn .1s steps(3); }
+.modal-box {
+  background: var(--panel);
+  color: var(--text);
+  width: 460px;
+  max-width: 95%;
+  border: 1px solid var(--border2);
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(0,0,0,.8);
+}
+.modal-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--panel2);
+}
+.modal-title {
+  font-family: var(--font-hd);
+  font-size: .9rem;
+  color: var(--cobalt-hi);
+  
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.modal-close {
+  background: none;
+  border: 1px solid var(--border2);
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--font-bd);
+  font-size: .65rem;
+  padding: 2px 6px;
+  transition: all .1s;
+}
+.modal-close:hover { color: var(--rose-hi); border-color: var(--rose-hi); }
+
+/* ═══════════════════════════════════════════════
+   CHIPS
+═══════════════════════════════════════════════ */
+.quick-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.chip {
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  padding: 2px 10px;
+  font-family: var(--mono);
+  font-size: .7rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text2);
+  letter-spacing: .02em;
+  transition: all .1s;
+  border-radius: 20px;
+}
+.chip:hover { background: rgba(58,123,213,0.15); border-color: var(--cobalt); color: var(--cobalt-hi); }
+
+/* ═══════════════════════════════════════════════
+   SPECIAL INPUTS
+═══════════════════════════════════════════════ */
+#inputModel {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  font-size: .9rem;
+  color: var(--text);
+  border-color: var(--border2);
+  background: var(--input-bg);
+  letter-spacing: .06em;
+}
+#inputModel:focus {
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 2px rgba(58,123,213,0.2);
+}
+#finalOutput {
+  font-family: var(--mono);
+  font-size: .85rem;
+  line-height: 1.7;
+  background: var(--input-bg);
+  color: var(--text);
+  letter-spacing: .01em;
+}
+#directionOut {
+  font-family: var(--mono);
+  font-size: .85rem;
+  background: var(--input-bg);
+  border-color: var(--border2);
+  color: var(--text);
+  line-height: 1.7;
+}
+
+/* ═══════════════════════════════════════════════
+   VIEW HEADINGS
+═══════════════════════════════════════════════ */
+.view-heading {
+  font-family: var(--font-hd);
+  font-size: .9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border2);
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════
+   SCROLLBARS
+═══════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); }
+::-webkit-scrollbar-thumb:hover { background: var(--cobalt); }
+
+/* ═══════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════ */
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes recPulse { 0%,100% { box-shadow: 0 0 12px rgba(255,60,60,0.7); } 50% { box-shadow: 0 0 4px rgba(255,60,60,0.2); } }
+@keyframes dotPulse { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes blink    { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* ═══════════════════════════════════════════════
+   BANNER ALERTS
+═══════════════════════════════════════════════ */
+.banner-warn  { background: rgba(255,230,0,0.05); border: 1px solid rgba(255,230,0,0.3); padding: 8px 10px; }
+.banner-danger{ background: rgba(255,60,60,0.05); border: 1px solid rgba(255,60,60,0.3); padding: 8px 10px; }
+.banner-label { font-family: var(--font-bd); font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; }
+
+/* ═══════════════════════════════════════════════
+   RIGHT VIEWS
+═══════════════════════════════════════════════ */
+.right-view { display: none; }
+.right-view.active { display: block; animation: fadeIn .15s steps(4); }
+
+/* ═══════════════════════════════════════════════
+   MOBILE
+═══════════════════════════════════════════════ */
+@media(max-width: 768px) {
+  #workArea { flex-direction: column; }
+  #leftPanel, #rightPanel { width: 100%; }
+  #sidebar { display: none; }
+  #mobileMenuBtn { display: flex !important; }
+}
+#mobileMenuBtn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--cobalt-hi);
+  font-family: var(--font-bd);
+  font-size: .7rem;
+  cursor: pointer;
+  padding: 3px 8px;
+  align-items: center;
+  justify-content: center;
+  transition: all .1s;
+}
+#mobileMenuBtn:hover { border-color: var(--cobalt-hi);  }
+#mobileOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+}
+#mobileSidebar {
+  position: fixed;
+  top: 0;
+  left: -260px;
+  bottom: 0;
+  width: 240px;
+  background: var(--panel);
+  z-index: 1001;
+  transition: left .2s steps(4);
+  border-right: 1px solid var(--border2);
+  
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════
+   STATUS DOT
+═══════════════════════════════════════════════ */
+.status-dot { width: 6px; height: 6px; background: var(--border2); display: inline-block; }
+.status-dot.live { background: var(--forest);  animation: dotPulse 1.5s infinite; }
+</style>
+</head>
+<body>
+
+<!-- ══ MOBILE ══ -->
+<div id="mobileOverlay" onclick="closeMobileNav()"></div>
+<div id="mobileSidebar">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--border2);font-family:var(--font-hd);font-size:1.1rem;font-weight:700;color:var(--text);letter-spacing:3px;line-height:1.4">TTS<br>SUITE</div>
+  <div style="padding:14px;border-bottom:1px solid var(--border2);cursor:pointer" onclick="mobileTab('notes')">📝 Smart Notes</div>
+  <div style="padding:14px;border-bottom:1px solid var(--border2);cursor:pointer" onclick="mobileTab('library')">📚 Case Library</div>
+  <div style="padding:14px;border-bottom:1px solid var(--border2);cursor:pointer" onclick="mobileTab('shortcuts')">⚡ Shortcuts</div>
+  <div style="padding:14px;border-bottom:1px solid var(--border2);cursor:pointer" onclick="mobileTab('tools')">🔧 Tools</div>
+  <div style="padding:14px;cursor:pointer" onclick="mobileTab('settings')">⚙️ Settings</div>
+</div>
+
+<!-- ══ SIDEBAR ══ -->
+<div id="sidebar">
+  <div class="nav-item active" data-tab="notes"     onclick="switchTab('notes')">
+    <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+    <span class="nav-label">Smart Notes</span>
+  </div>
+  <div class="nav-item" data-tab="library" onclick="switchTab('library')">
+    <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></span>
+    <span class="nav-label">Case Library</span>
+  </div>
+  <div class="nav-item" data-tab="shortcuts" onclick="switchTab('shortcuts')">
+    <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+    <span class="nav-label">Shortcuts</span>
+  </div>
+  <div class="nav-item" data-tab="tools" onclick="switchTab('tools')">
+    <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></span>
+    <span class="nav-label">Tools</span>
+  </div>
+  <div class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+    <span class="nav-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>
+    <span class="nav-label">Settings</span>
+  </div>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div id="main-content">
+  <header>
+    <button id="mobileMenuBtn" onclick="openMobileNav()">☰</button>
+    <div class="header-brand">
+      <div>
+        <div class="brand-name">TTS <span style="color:var(--cobalt-hi)">Suite</span></div>
+      </div>
+      <span class="brand-version">v10.1</span>
+      <span id="envBadge" class="env-badge" onclick="switchTab('settings')" title="Environment — click for settings">Canvas API</span>
+    </div>
+    <div class="header-center">
+      <div class="timer-group">
+        <div class="timer-item" onclick="handleTimerClick('call')">
+          <div class="timer-label">Call</div>
+          <div id="callTimer" class="timer-value" style="color:var(--forest-hi)">00:00</div>
+        </div>
+        <div class="timer-item" onclick="handleTimerClick('acw')">
+          <div class="timer-label">ACW</div>
+          <div id="acwTimer" class="timer-value" style="color:var(--text2)">00:00</div>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="call-counter">
+        <button class="counter-btn dec" onclick="adjustCalls(-1)">−</button>
+        <div class="counter-mid" onclick="resetCallCount()">
+          <div class="timer-label">Calls</div>
+          <div id="callCount" class="timer-value" style="color:var(--cobalt-hi)">0</div>
+        </div>
+        <button class="counter-btn inc" onclick="adjustCalls(1)">+</button>
+      </div>
+      <div id="clock">00:00:00</div>
+    </div>
+  </header>
+
+  <div id="workArea">
+    <!-- ════ LEFT PANEL ════ -->
+    <div id="leftPanel">
+
+      <!-- Model # -->
+      <div class="panel-section">
+        <input type="text" id="inputModel" placeholder="MODEL # (optional)" class="smart-input"
+               style="font-family:monospace;text-transform:uppercase;color:var(--cobalt-hi);font-size:.88rem;border-color:var(--cobalt-hi)">
+        <label style="display:flex;align-items:center;gap:7px;margin-top:7px;cursor:pointer;user-select:none">
+          <input type="checkbox" id="chkNotWithUnit" onchange="handleNotWithUnit(this)"
+                 style="width:14px;height:14px;accent-color:var(--cobalt-hi);cursor:pointer">
+          <span style="font-size:.8rem;color:var(--muted)">Tech not with unit (phone / remote diagnosis)</span>
+        </label>
+      </div>
+
+      <!-- Repeat / Suggestions banners -->
+      <div id="rediagPanel" style="display:none;background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.3);border-radius:var(--radius);padding:10px 14px">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--amber-hi);margin-bottom:6px">Prior Cases — This Unit</div>
+        <div id="rediagList"></div>
+      </div>
+      <div id="suggestPanel" style="display:none" class="panel-section">
+        <div style="font-size:.8rem;font-weight:bold;color:var(--cobalt-hi);margin-bottom:6px">Related Cases</div>
+        <div id="suggestList" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+
+      <!-- File:// warning -->
+      <div id="fileWarn" style="display:none;background:rgba(255,77,106,.06);border:1px solid rgba(255,77,106,.3);border-radius:var(--radius);padding:9px 12px;font-size:.8rem;color:var(--rose-hi);line-height:1.6">
+        ⚠️ <strong>Mic blocked on file:// URLs.</strong> Use localhost or HTTPS.
+      </div>
+
+      <!-- Transcription -->
+      <div class="panel-section" style="border-color:rgba(255,193,7,.3)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text2)">Transcription</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="display:flex;gap:4px">
+              <button id="btnModeMic"  class="audio-mode-btn active" onclick="setAudioMode('mic')">🎤 Mic</button>
+              <button id="btnModeDual" class="audio-mode-btn"        onclick="setAudioMode('dual')">🎤+🔊 Dual</button>
+            </div>
+            <button id="btnRecord" class="btn btn-warn" style="padding:5px 12px">Start</button>
+          </div>
+        </div>
+
+        <div id="dualInfo" style="display:none;background:rgba(191,95,255,0.08);border:1px solid var(--violet);border-radius:6px;padding:8px;font-size:.8rem;color:#a080e0;margin-bottom:8px;line-height:1.5">
+          🔊 <strong>Dual Channel:</strong> Mic = <span style="color:var(--tech)">[TECH]</span> · Speaker/headphone = <span style="color:var(--cx)">[CX]</span><br>
+          When Chrome prompts, select a window/tab and enable <strong>"Share system audio"</strong>.
+        </div>
+
+        <div id="audioKeyPanel" style="display:none;margin-bottom:8px;padding:8px;border-radius:6px;background:rgba(191,95,255,0.08);border:1px solid var(--violet)">
+          <div style="font-size:.8rem;font-weight:bold;color:#a080e0;margin-bottom:4px">🔑 API Managed Automatically</div>
+          <div id="audioKeyStatus" style="font-size:.72rem;color:var(--muted);margin-top:4px"></div>
+        </div>
+
+        <div id="channelBar" style="display:none;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <div class="ch-dot on" id="dotTech" style="background:var(--tech)"></div>
+          <span style="font-size:.72rem;font-weight:bold;color:var(--tech)">TECH</span>
+          <div class="ch-dot" id="dotCx" style="margin-left:8px"></div>
+          <span id="lblCx" style="font-size:.72rem;font-weight:bold;color:#555">SYSTEM</span>
+          <span id="cxStatus" style="font-size:.72rem;color:var(--muted);margin-left:4px"></span>
+        </div>
+
+        <div id="interimBar" class="interim-bar">…</div>
+
+        <textarea id="transcript" style="min-height:90px;font-size:.82rem;line-height:1.7;font-family:'Segoe UI',monospace"
+                  placeholder="🎤 Mic: Your voice appears here.&#10;🎤+🔊 Dual: [TECH] = your voice / [CX] = caller audio.&#10;&#10;You can also type notes directly."></textarea>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <button class="btn btn-ghost" style="font-size:.78rem;padding:4px 10px" onclick="clearTranscript()">Clear</button>
+          <span style="font-size:.8rem;color:var(--muted)"><span id="wordCount">0</span> words</span>
+        </div>
+      </div>
+
+      <!-- Note Builder -->
+      <div class="panel-section">
+        <div class="section-header">
+          <span>Note Builder</span>
+          <span style="font-size:.65rem;color:var(--muted);font-weight:normal;letter-spacing:.02em">Tab ▸ / ⇧Tab ◂</span>
+        </div>
+        <div class="quick-toolbar">
+          <button class="tool-btn" onclick="qi('___-___: ___VAC')">VAC</button>
+          <button class="tool-btn" onclick="qi('___-___: ___VDC')">VDC</button>
+          <button class="tool-btn" onclick="qi('___-___: ___Ω')">Ω</button>
+          <button class="tool-btn" onclick="qi('___-___: ___kΩ')">kΩ</button>
+          <button class="tool-btn" onclick="qi('___-___: OL')">OL</button>
+          <button class="tool-btn" onclick="qi('___°F')">°F</button>
+          <button class="tool-btn" onclick="qi('___A draw')">Amps</button>
+          <button class="tool-btn" onclick="qi('___PSI')">PSI</button>
+          <button class="tool-btn" onclick="qi('Error code: F___')">Error</button>
+          <button class="tool-btn" onclick="qi('Spec: ___')">Spec</button>
+          <button class="tool-btn" onclick="qi('Visual: ___')">Visual</button>
+          <button class="tool-btn" onclick="qi('Rotation: ___')">Rotation</button>
+        </div>
+
+        <div class="note-section-group" data-sec="history_import">
+          <div class="note-section-header" onclick="toggleNoteSection(this)">
+            0. Case History Scraper <span style="font-size:.78rem;color:var(--muted);font-weight:normal">→ Drop old notes here</span>
+          </div>
+          <div class="note-section-content">
+            <textarea id="sec-history-import" class="smart-input"
+                      placeholder="Paste previous case notes, part lists, or prior tech findings here…&#10;&#10;The AI will extract part numbers, dates, and test results automatically."></textarea>
+          </div>
+        </div>
+
+        <div class="note-section-group active" data-sec="concern">
+          <div class="note-section-header" onclick="toggleNoteSection(this)">
+            1. Complaint <span style="font-size:.78rem;color:var(--muted);font-weight:normal">→ "Complaint of this call"</span>
+            <span id="cnt-concern" style="font-size:.78rem;color:var(--cobalt-hi)"></span>
+          </div>
+          <div class="note-section-content">
+            <textarea id="sec-concern" class="smart-input" placeholder="Customer said unit not cooling&#10;Loud grinding noise during spin"></textarea>
+          </div>
+        </div>
+
+        <div class="note-section-group" data-sec="diag">
+          <div class="note-section-header" onclick="toggleNoteSection(this)">
+            2. Checks & Tests <span style="font-size:.78rem;color:var(--muted);font-weight:normal">→ "Before/During call"</span>
+            <span id="cnt-diag" style="font-size:.78rem;color:var(--cobalt-hi)"></span>
+          </div>
+          <div class="note-section-content">
+            <textarea id="sec-diag" class="smart-input" placeholder="Before call: No prior service&#10;&#10;Tests:&#10;J2-4/5: 6.3Ω&#10;Visual: No damage"></textarea>
+          </div>
+        </div>
+
+        <div class="note-section-group" data-sec="parts">
+          <div class="note-section-header" onclick="toggleNoteSection(this)">
+            3. Parts & Reason <span style="font-size:.78rem;color:var(--muted);font-weight:normal">→ "Prior work"</span>
+            <span id="cnt-parts" style="font-size:.78rem;color:var(--cobalt-hi)"></span>
+          </div>
+          <div class="note-section-content">
+            <textarea id="sec-parts" class="smart-input" placeholder="Shifter actuator (W10006355)&#10;&#10;Why: Resistance 2.4kΩ vs spec 1.8kΩ"></textarea>
+          </div>
+        </div>
+
+        <div class="note-section-group" data-sec="res">
+          <div class="note-section-header" onclick="toggleNoteSection(this)">
+            4. Resolution <span style="font-size:.78rem;color:var(--muted);font-weight:normal">→ "Interpretation + Resolution"</span>
+            <span id="cnt-res" style="font-size:.78rem;color:var(--cobalt-hi)"></span>
+          </div>
+          <div class="note-section-content">
+            <textarea id="sec-res" class="smart-input" placeholder="What's wrong: Shifter out of spec.&#10;&#10;Done: Replaced, retested good."></textarea>
+          </div>
+        </div>
+
+        <div class="note-section-group" data-sec="images">
+          <div class="note-section-header" onclick="toggleNoteSection(this)">
+            5. Visual Evidence
+            <span id="imgCount" style="font-size:.78rem;color:var(--cobalt-hi);font-weight:normal"></span>
+          </div>
+          <div class="note-section-content">
+            <label id="imgDropZone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:2px dashed var(--border2);cursor:pointer;transition:border-color .15s;padding:10px;text-align:center;gap:3px;margin-bottom:8px">
+              <input type="file" id="imgFileInput" accept="image/*" multiple style="display:none" onchange="handleImageFiles(this.files)">
+              <span style="font-size:.8rem;color:var(--muted)">Drop images or click to attach</span>
+              <span style="font-size:.7rem;color:var(--dim)">JPEG · PNG · WEBP · max 5 images</span>
+            </label>
+            <div id="imgPreviews" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ════ RIGHT PANEL ════ -->
+    <div id="rightPanel">
+
+      <!-- NOTES VIEW -->
+      <div id="notesView" class="right-view active">
+        <!-- Regen bar: appears after generation, consolidates Copy + per-section regen buttons -->
+        <div id="regenBar" style="display:none;gap:5px;flex-wrap:wrap;margin-bottom:8px;padding:6px 8px;background:rgba(0,188,212,.04);border:1px solid rgba(0,188,212,.2);border-radius:6px;align-items:center">
+          <button onclick="copyOut()" class="btn btn-ghost" style="font-size:.8rem;padding:4px 10px">⎘ Copy</button>
+          <span style="font-size:.72rem;color:#555;margin:0 2px">|</span>
+          <button data-regen="complaint"      onclick="regenerateSection('complaint')"      class="btn btn-ghost" style="font-size:.8rem;padding:4px 8px" title="Regenerate Complaint section">↻ Complaint</button>
+          <button data-regen="during_call"    onclick="regenerateSection('during_call')"    class="btn btn-ghost" style="font-size:.8rem;padding:4px 8px" title="Regenerate Checks section">↻ Checks</button>
+          <button data-regen="interpretation" onclick="regenerateSection('interpretation')" class="btn btn-ghost" style="font-size:.8rem;padding:4px 8px" title="Regenerate Interpretation">↻ Interpret</button>
+          <button data-regen="resolution"     onclick="regenerateSection('resolution')"     class="btn btn-ghost" style="font-size:.8rem;padding:4px 8px" title="Regenerate Resolution">↻ Resolution</button>
+        </div>
+        <div style="margin-bottom:12px">
+          <textarea id="finalOutput" style="min-height:420px" placeholder="AI output will appear here…"></textarea>
+        </div>
+
+        <!-- Quick Direction -->
+        <div class="panel-section" style="border-color:var(--cobalt-hi);margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--cobalt-hi)">Quick Direction</span>
+            <button id="btnDirection" class="btn btn-primary" style="font-size:.8rem;padding:5px 10px">Analyze & Get Direction</button>
+          </div>
+          <textarea id="directionOut" style="min-height:70px;font-size:.82rem;background:var(--input-bg);border:1px solid rgba(0,188,212,.3);resize:vertical"
+                    class="smart-input" readonly placeholder="Click 'Analyze & Get Direction' for 2-3 sentence guidance…"></textarea>
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button id="btnGenerate" class="btn btn-primary">Generate Smart Notes</button>
+          <button id="btnStream" class="btn" style="width:100%;padding:9px;font-size:.78rem;background:rgba(191,95,255,0.08);border:1px solid var(--violet);color:#a080e0;letter-spacing:.01em">Stream Output</button>
+          <div style="display:flex;gap:6px">
+            <button id="btnSave"  class="btn btn-success" style="flex:1;padding:9px">Save</button>
+            <button id="btnLearn" class="btn btn-primary"  style="flex:1;padding:9px;display:none">Learn</button>
+            <button id="btnNext"  class="btn btn-danger"   style="flex:1;padding:9px">Next Call</button>
+          </div>
+          <div id="learnStatus" style="display:none;font-size:.8rem;text-align:center;color:var(--muted)">
+            <span id="learnCount">0</span> examples learned
+          </div>
+        </div>
+      </div>
+
+      <!-- LIBRARY VIEW -->
+      <div id="libraryView" class="right-view">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h2 style="font-size:1.1em;font-weight:bold;color:var(--cobalt-hi);text-transform:uppercase">📚 Case Library <span id="libCount" style="font-size:.8rem;opacity:.6">(0)</span></h2>
+          <div style="display:flex;gap:6px">
+            <button id="btnBulkSelect" onclick="toggleBulkSelect()" class="btn btn-ghost" style="font-size:.8rem;padding:5px 10px">☐ Select</button>
+            <button id="btnExportLib" class="btn btn-primary" style="font-size:.8rem;padding:5px 10px">💾 Export</button>
+            <button id="btnImportLib" class="btn btn-ghost"   style="font-size:.78rem;padding:5px 10px">📂 Import</button>
+            <input type="file" id="importLibInput" style="display:none" accept=".json">
+          </div>
+        </div>
+        <div id="bulkActionBar" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:8px 12px;margin-bottom:8px;align-items:center;justify-content:space-between">
+          <span id="bulkCountLabel" style="font-size:.78rem;color:var(--rose-hi);font-weight:bold">0 selected</span>
+          <div style="display:flex;gap:6px">
+            <button onclick="archiveSelected()" class="btn" style="font-size:.8rem;padding:4px 10px;background:rgba(255,152,0,.1);color:#ff9800;border:1px solid rgba(255,152,0,.4)">Archive</button>
+            <button onclick="deleteSelected()" class="btn btn-danger" style="font-size:.8rem;padding:4px 10px">Delete</button>
+            <button onclick="toggleBulkSelect()" class="btn btn-ghost" style="font-size:.8rem;padding:4px 10px">Cancel</button>
+          </div>
+        </div>
+        <div class="panel-section" style="margin-bottom:10px">
+          <input type="text" id="libSearch" placeholder="🔍 Search model, symptom, content…"
+                 class="smart-input" style="font-size:.82rem;margin-bottom:8px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+            <div class="filter-pill active" data-filter="all">All</div>
+            <div class="filter-pill" data-filter="catalog">Saved</div>
+            <div class="filter-pill" data-filter="knowledge">Knowledge</div>
+            <div class="filter-pill" data-filter="history">History</div>
+          </div>
+          <div id="tagFilterBar" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border2)"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <label style="font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" id="showArchivedToggle" onchange="renderLibrary()" style="width:12px;height:12px">
+              Show archived
+            </label>
+            <button onclick="activeTagFilters.clear();renderTagFilterBar();renderLibrary()" style="font-size:.72rem;color:var(--muted);background:none;border:none;cursor:pointer;margin-left:auto">Clear tag filters</button>
+          </div>
+          <select id="libSort" class="smart-input" style="font-size:.78rem;padding:6px">
+            <option value="recent">Most Recent</option>
+            <option value="model">Model Number</option>
+            <option value="type">Type</option>
+          </select>
+        </div>
+        <div class="panel-section" style="margin-bottom:10px;border-color:var(--text2)">
+          <div class="section-header" style="color:var(--text2)">➕ Add Knowledge Entry</div>
+          <input type="text" id="kbModel" placeholder="Model #" class="smart-input" style="font-size:.82rem;margin-bottom:6px">
+          <textarea id="kbSym" placeholder="Symptom / Fix / Notes…" class="smart-input" style="font-size:.82rem;min-height:60px;margin-bottom:6px"></textarea>
+          <button id="btnAddKB" class="btn btn-primary" style="width:100%;font-size:.78rem">Add to Knowledge Base</button>
+        </div>
+        <div id="caseList"></div>
+      </div>
+
+      <!-- SHORTCUTS VIEW -->
+      <div id="shortcutsView" class="right-view">
+        <div class="view-heading">⚡ Template Library</div>
+        <div class="panel-section" style="margin-bottom:10px">
+          <div class="section-header">Create New Template</div>
+          <input type="text" id="newScTitle" placeholder="Template Title" class="smart-input" style="font-size:.82rem;margin-bottom:6px">
+          <textarea id="newScContent" placeholder="Full technical body text…" class="smart-input" style="font-size:.82rem;min-height:70px;margin-bottom:6px"></textarea>
+          <button id="btnAddSc" class="btn btn-primary" style="width:100%;font-size:.78rem">Add to Library</button>
+        </div>
+        <div id="scList" style="background:var(--panel);border:1px solid var(--border2);border-radius:8px;overflow:hidden"></div>
+      </div>
+
+
+      <!-- TOOLS VIEW -->
+      <div id="toolsView" class="right-view">
+        <!-- Stopwatch -->
+        <div class="panel-section" style="border-color:var(--cobalt-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--cobalt-hi)">Stopwatch</div>
+          <div style="text-align:center;padding:12px 0;font-size:2em;font-weight:800;font-family:monospace;color:var(--cobalt-hi)" id="swDisplay">00:00:00</div>
+          <div style="display:flex;gap:6px">
+            <button id="btnSwStart" class="btn btn-primary" style="flex:1;font-size:.78rem">Start</button>
+            <button id="btnSwStop"  class="btn btn-danger"  style="flex:1;font-size:.78rem">Stop</button>
+            <button id="btnSwReset" class="btn btn-ghost"   style="flex:1;font-size:.78rem">Reset</button>
+          </div>
+        </div>
+        <!-- Thermistor -->
+        <div class="panel-section" style="border-color:var(--amber-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--text2)">Thermistor Calc</div>
+          <select id="thermType" class="smart-input" style="font-size:.82rem;margin-bottom:6px">
+            <option value="2.7k">2.7kΩ @ 77°F (Standard NTC)</option>
+            <option value="10k">10kΩ @ 77°F (Alternative NTC)</option>
+          </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <input type="number" id="thermRes"  placeholder="Resistance (Ω or kΩ)" class="smart-input" style="font-size:.82rem">
+            <input type="number" id="thermTemp" placeholder="Temp (°F)"             class="smart-input" style="font-size:.82rem">
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <button id="btnResToTemp" class="btn btn-primary" style="flex:1;font-size:.78rem">Ω → °F</button>
+            <button id="btnTempToRes" class="btn btn-primary" style="flex:1;font-size:.78rem">°F → Ω</button>
+            <button onclick="$('thermRes').value='';$('thermTemp').value='';const r=$('thermResult');if(r){r.textContent='Enter value and convert';r.style.color='';r.innerHTML='Enter value and convert';}" class="btn btn-ghost" style="font-size:.78rem;padding:6px 10px">Reset</button>
+          </div>
+          <div id="thermResult" style="font-size:.78rem;text-align:center;padding:8px;background:var(--input-bg);border-radius:4px;color:var(--muted)">Enter value and convert</div>
+          <div style="margin-top:8px;font-size:.72rem;color:var(--muted)">
+            <div style="font-weight:bold;margin-bottom:3px">Quick Ref (2.7kΩ):</div>
+            32°F=9.15kΩ · 42°F=6.85kΩ · 48°F=5.78kΩ · 69°F=3.30kΩ · 77°F=2.70kΩ
+          </div>
+        </div>
+        <!-- Temp converter -->
+        <div class="panel-section" style="margin-bottom:12px">
+          <div class="section-header">Temp Converter</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <input type="number" id="tempF" placeholder="°F" class="smart-input" style="font-size:.82rem">
+            <input type="number" id="tempC" placeholder="°C" class="smart-input" style="font-size:.82rem">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button id="btnFtoC" class="btn btn-primary" style="flex:1;font-size:.78rem">F→C</button>
+            <button id="btnCtoF" class="btn btn-primary" style="flex:1;font-size:.78rem">C→F</button>
+            <button onclick="$('tempF').value='';$('tempC').value='';" class="btn btn-ghost" style="font-size:.78rem;padding:6px 10px">Reset</button>
+          </div>
+        </div>
+        <!-- Ohm's Law -->
+        <div class="panel-section">
+          <div class="section-header">Ohm's Law</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+            <input type="number" id="ohmV" placeholder="V"   class="smart-input" style="font-size:.82rem">
+            <input type="number" id="ohmI" placeholder="A"   class="smart-input" style="font-size:.82rem">
+            <input type="number" id="ohmR" placeholder="Ω"   class="smart-input" style="font-size:.82rem">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button id="btnCalcOhm" class="btn btn-primary" style="flex:1;font-size:.78rem">Calculate</button>
+            <button onclick="$('ohmV').value='';$('ohmI').value='';$('ohmR').value='';" class="btn btn-ghost" style="font-size:.78rem;padding:6px 10px">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS VIEW -->
+      <div id="settingsView" class="right-view">
+
+        <!-- Environment Status -->
+        <div class="panel-section" style="border-color:var(--cobalt-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--cobalt-hi)">Environment</div>
+          <div id="envDetail" style="font-size:.82rem;line-height:1.7;padding:8px;background:var(--input-bg);border-radius:4px;color:var(--muted)">Detecting…</div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button onclick="testConnection()" class="btn btn-success" style="flex:1;font-size:.78rem">🧪 Test Connection</button>
+            <button onclick="retryEnvDetection()" class="btn btn-ghost" style="font-size:.78rem;padding:6px 10px" title="Clear cached detection and re-run">🔍 Retry</button>
+          </div>
+        </div>
+
+        <!-- API Keys -->
+        <div class="panel-section" style="border-color:var(--amber-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--text2)">API Keys</div>
+          <div style="font-size:.8rem;color:var(--muted);margin-bottom:4px; line-height: 1.5;">
+            ✅ API Keys are managed automatically by the internal Canvas API environment. You do not need to manually configure API keys for any features.
+          </div>
+        </div>
+
+        <!-- AHT -->
+        <div class="panel-section" style="border-color:var(--amber-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--text2)">AHT Thresholds</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-size:.8rem;color:var(--muted);margin-bottom:3px">Warn (min)</div>
+              <input type="number" id="ahtWarn"  value="5" min="1" max="60" class="smart-input" style="font-size:.88rem">
+            </div>
+            <div>
+              <div style="font-size:.8rem;color:var(--muted);margin-bottom:3px">Alert (min)</div>
+              <input type="number" id="ahtAlert" value="8" min="1" max="60" class="smart-input" style="font-size:.88rem">
+            </div>
+          </div>
+          <button onclick="saveAHT()" class="btn btn-warn" style="width:100%;font-size:.78rem">Save Thresholds</button>
+        </div>
+
+        <!-- Repeat -->
+        <div class="panel-section" style="border-color:var(--rose-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--rose-hi)">Repeat Unit Thresholds</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-size:.8rem;color:var(--muted);margin-bottom:3px">Min Calls</div>
+              <input type="number" id="rptCount" value="3" min="2" max="20" class="smart-input" style="font-size:.88rem">
+            </div>
+            <div>
+              <div style="font-size:.8rem;color:var(--muted);margin-bottom:3px">Within (days)</div>
+              <input type="number" id="rptDays"  value="30" min="1" max="365" class="smart-input" style="font-size:.88rem">
+            </div>
+          </div>
+          <button onclick="saveRepeat()" class="btn btn-danger" style="width:100%;font-size:.78rem">Save Thresholds</button>
+        </div>
+
+        <!-- Google Sheets -->
+        <div class="panel-section" style="border-color:var(--forest-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--forest-hi)">Google Sheets Sync</div>
+          <input type="url" id="sheetsUrl" placeholder="https://script.google.com/macros/s/…/exec"
+                 class="smart-input" style="font-size:.78rem;margin-bottom:6px">
+          <div style="display:flex;gap:6px">
+            <button onclick="saveSheets()" class="btn btn-success" style="flex:1;font-size:.78rem">💾 Save</button>
+            <button onclick="testSheets()"  class="btn btn-ghost"   style="font-size:.78rem;padding:5px 10px">Test</button>
+            <button onclick="clearSheets()" class="btn btn-danger"  style="font-size:.78rem;padding:5px 10px">✕</button>
+          </div>
+          <div id="sheetsStatus" style="font-size:.72rem;color:var(--muted);margin-top:4px"></div>
+          <div id="sheetsQueueStatus" style="display:none;font-size:.72rem;margin-top:4px;padding:4px 8px;background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:4px">
+            <span id="sheetsQueueText" style="color:#ff9800"></span>
+            <button onclick="processSheetQueue()" style="float:right;font-size:.85rem;background:none;border:none;color:#ff9800;cursor:pointer;padding:0">Flush ▶</button>
+          </div>
+          <div id="sheetsLogPanel" style="display:none;margin-top:6px">
+            <div style="font-size:.65rem;font-weight:bold;color:var(--muted);text-transform:uppercase;margin-bottom:3px">Sync Log</div>
+            <div id="sheetsLogList" style="font-size:.7rem;color:var(--muted);max-height:80px;overflow-y:auto"></div>
+          </div>
+          <details style="margin-top:8px">
+            <summary style="font-size:.72rem;color:var(--muted);cursor:pointer">📋 Apps Script template (click to expand)</summary>
+            <div style="margin-top:6px;padding:8px;background:var(--input-bg);border-radius:4px;font-size:.7rem;font-family:monospace;color:var(--muted);white-space:pre;overflow-x:auto">function doPost(e) {
+  try {
+    var s = SpreadsheetApp.getActiveSpreadsheet()
+              .getSheetByName('TTS Data')
+              || SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var d = JSON.parse(e.postData.contents);
+    s.appendRow([d.date,d.model,d.applianceType,
+      d.concern,d.diag,d.parts,d.resolution,
+      d.fullNote,d.callSec,d.acwSec,d.outcomeTag,d.env,d.ttsVersion]);
+    return ContentService
+      .createTextOutput(JSON.stringify({success:true,row:s.getLastRow()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({success:false,error:err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({status:'ok',version:'2'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:4px">Deploy as: Execute as → Me &nbsp;|&nbsp; Who has access → Anyone</div>
+          </details>
+        </div>
+
+        <!-- Learning -->
+        <div class="panel-section" style="border-color:var(--cobalt-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--cobalt-hi)">AI Learning</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--panel2);border-radius:6px">
+            <div style="font-size:.82rem"><span style="color:var(--cobalt-hi);font-weight:bold" id="learningExCount">0</span> examples learned</div>
+            <div style="display:flex;gap:5px">
+              <button onclick="viewExamples()" class="btn btn-primary" style="font-size:.8rem;padding:4px 10px">View</button>
+              <button onclick="clearLearning()" class="btn btn-danger" style="font-size:.8rem;padding:4px 10px">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display -->
+        <div class="panel-section" style="margin-bottom:12px">
+          <div class="section-header">Display</div>
+          <button id="btnTheme" class="btn btn-primary" style="width:100%;font-size:.78rem">Toggle Light / Dark Mode</button>
+        </div>
+
+        <!-- Backup -->
+        <div class="panel-section" style="border-color:var(--cobalt-hi);margin-bottom:12px">
+          <div class="section-header" style="color:var(--cobalt-hi)">Backup & Data</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button id="btnExport"        class="btn btn-primary" style="font-size:.78rem">💾 Export Full Backup</button>
+            <button onclick="exportPL()"  class="btn" style="font-size:.78rem;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.5);color:#a080e0">📊 Export for Pattern Library</button>
+            <button id="btnImport"        class="btn btn-ghost"   style="font-size:.78rem">📂 Import Backup</button>
+            <input type="file" id="importFileInput" style="display:none" accept=".json">
+            <button onclick="restoreBackup()" class="btn btn-warn" style="font-size:.78rem">⏮️ Restore Auto-Backup</button>
+            <button onclick="restoreDefaultShortcuts()" class="btn btn-success" style="font-size:.78rem">🔄 Restore Default Templates</button>
+          </div>
+        </div>
+
+        <button onclick="factoryReset()" class="btn btn-danger" style="width:100%;font-size:.78rem">⚠️ Factory Reset</button>
+      </div>
+
+    </div><!-- /rightPanel -->
+  </div><!-- /workArea -->
+</div><!-- /main-content -->
+
+<!-- Modals -->
+<div id="confirmModal" class="modal">
+  <div class="modal-box" style="width:420px">
+    <div style="padding:24px;text-align:center">
+      <div id="confirmMsg" style="font-size:1em;font-weight:bold;margin-bottom:16px">Confirm</div>
+      <div style="display:flex;gap:8px">
+        <button id="confirmYes" class="btn btn-danger" style="flex:1;padding:12px">Yes</button>
+        <button onclick="closeModal('confirmModal')" class="btn btn-ghost" style="flex:1;padding:12px">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="previewModal" class="modal">
+  <div class="modal-box" style="width:600px;max-height:90vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">
+      <span id="previewTitle" style="font-weight:bold;color:var(--cobalt-hi);font-size:.85rem;text-transform:uppercase">Preview</span>
+      <button onclick="closeModal('previewModal')" style="background:none;border:none;cursor:pointer;font-size:1.2em;color:var(--muted)">✕</button>
+    </div>
+    <div style="padding:14px;flex:1;overflow-y:auto">
+      <pre id="previewBody" style="font-size:.78rem;white-space:pre-wrap;font-family:monospace;color:var(--muted);background:var(--input-bg);padding:12px;border-radius:6px"></pre>
+    </div>
+    <div style="display:flex;border-top:1px solid var(--border2)">
+      <button id="previewInsert" style="flex:1;padding:12px;color:var(--cobalt-hi);font-weight:bold;background:none;border:none;cursor:pointer;border-right:1px solid var(--border)">Insert to Notes</button>
+      <button onclick="closeModal('previewModal')" style="flex:1;padding:12px;color:var(--muted);background:none;border:none;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="editModal" class="modal">
+  <div class="modal-box">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:bold;color:var(--cobalt-hi);font-size:.85rem;text-transform:uppercase">Edit</span>
+      <button onclick="closeModal('editModal')" style="background:none;border:none;cursor:pointer;font-size:1.2em;color:var(--muted)">✕</button>
+    </div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div id="editTitleGroup">
+        <div style="font-size:.8rem;color:var(--muted);font-weight:bold;margin-bottom:4px">Title</div>
+        <input type="text" id="editTitle" class="smart-input" style="font-size:.85rem">
+      </div>
+      <div>
+        <div style="font-size:.8rem;color:var(--muted);font-weight:bold;margin-bottom:4px">Content</div>
+        <textarea id="editContent" class="smart-input" style="min-height:100px;font-size:.85rem"></textarea>
+      </div>
+    </div>
+    <div style="display:flex;border-top:1px solid var(--border2)">
+      <button id="editSave" style="flex:1;padding:12px;color:var(--cobalt-hi);font-weight:bold;background:none;border:none;cursor:pointer;border-right:1px solid var(--border)">Save</button>
+      <button onclick="closeModal('editModal')" style="flex:1;padding:12px;color:var(--muted);background:none;border:none;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Diff Modal ── -->
+<div id="diffModal" class="modal">
+  <div class="modal-box" style="width:680px;max-height:90vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:bold;color:var(--cobalt-hi);font-size:.85rem;text-transform:uppercase">🔍 Edit Diff</span>
+      <button onclick="closeModal('diffModal')" style="background:none;border:none;cursor:pointer;font-size:1.2em;color:var(--muted)">✕</button>
+    </div>
+    <div style="padding:10px 14px;background:var(--panel2);display:flex;gap:16px;font-size:.72rem;color:var(--muted)">
+      <span><span style="background:rgba(40,167,69,.25);padding:1px 6px;border-radius:3px">■</span> Added</span>
+      <span><span style="background:rgba(239,68,68,.25);padding:1px 6px;border-radius:3px">■</span> Removed</span>
+      <span><span style="background:rgba(255,255,255,.04);padding:1px 6px;border-radius:3px">■</span> Unchanged</span>
+    </div>
+    <div id="diffBody" style="flex:1;overflow-y:auto;padding:14px;font-size:.78rem;font-family:monospace;line-height:1.7"></div>
+    <div style="border-top:1px solid var(--border2)">
+      <button onclick="closeModal('diffModal')" style="width:100%;padding:12px;color:var(--muted);background:none;border:none;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Examples Modal ── -->
+<div id="examplesModal" class="modal">
+  <div class="modal-box" style="width:620px;max-height:90vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-weight:bold;color:var(--cobalt-hi);font-size:.85rem;text-transform:uppercase">🧠 Learning Examples</span>
+      <button onclick="closeModal('examplesModal')" style="background:none;border:none;cursor:pointer;font-size:1.2em;color:var(--muted)">✕</button>
+    </div>
+    <div id="examplesBody" style="flex:1;overflow-y:auto;padding:10px"></div>
+    <div style="border-top:1px solid var(--border2)">
+      <button onclick="closeModal('examplesModal')" style="width:100%;padding:12px;color:var(--muted);background:none;border:none;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Rate Modal ── -->
+<div id="rateModal" class="modal">
+  <div class="modal-box" style="width:380px">
+    <div style="padding:20px;text-align:center">
+      <div style="font-size:.88rem;font-weight:bold;margin-bottom:6px">Save as Training Example?</div>
+      <div id="rateModalDiff" style="font-size:.8rem;color:var(--muted);margin-bottom:14px"></div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Rate quality of your edit (higher = more influence)</div>
+      <div id="rateStars" style="display:flex;justify-content:center;gap:8px;margin-bottom:16px;font-size:1.6em">
+        <span onclick="selectRateStar(1)" data-star="1" style="cursor:pointer;opacity:.4">★</span>
+        <span onclick="selectRateStar(2)" data-star="2" style="cursor:pointer;opacity:.4">★</span>
+        <span onclick="selectRateStar(3)" data-star="3" style="cursor:pointer;opacity:.4">★</span>
+        <span onclick="selectRateStar(4)" data-star="4" style="cursor:pointer;opacity:.4">★</span>
+        <span onclick="selectRateStar(5)" data-star="5" style="cursor:pointer;opacity:.4">★</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="rateSaveBtn" onclick="confirmRateAndLearn()" class="btn btn-primary" style="flex:1;padding:10px;font-size:.82rem">💾 Save Example</button>
+        <button onclick="closeModal('rateModal')" class="btn btn-ghost" style="flex:1;padding:10px;font-size:.82rem">Skip</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" style="position:fixed;bottom:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:6px"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════
+// DEFAULT SHORTCUTS
+// ════════════════════════════════════════════════════════════
+const DEFAULT_SHORTCUTS = [
+    { title:'GFCI Nuisance Trip - Quick Check', content:'GFCI Nuisance Trip - Quick Check (W11525530 Rev C)\nStep 1 - Appliance Test:\n- Run diagnostics for error codes\n- Check ground, polarity, and voltage under load\n- Check resistance on all loads (no shorts to ground)\n- Measure amp draw vs breaker rating\n\nStep 2 - If Appliance is OK:\n- Show findings to customer & explain unit working correctly\n- Refer customer to a licensed electrician\n- Mandatory Action: Fill out and leave the Circuit Breaker form' },
+    { title:'Sealed System Diagnostic', content:'Sealed System Diagnostic\nMeasurements Required:\n- Low side: _____\n- High side: _____\n- Amp draw: _____\n- Equalization: _____\n\nLeak Detection:\n- UV light & glasses: Y/N\n- Nitrogen check: Y/N\n- System Isolated: Y/N\n\nSafety: Same hoses/gauges for R600a & R134a? Y/N' },
+    { title:'Damage Assessment', content:'Damage Assessment\n- Functional damage? Yes/No\n- Cause: Consumer/Installer/Servicer\n- Concealed (before box opened)? Y/N\n- Repairable? Yes/No\n- Location: _____' },
+    { title:'Moisture Quick Check Protocol', content:'Moisture Quick Check Protocol\n1. Mullion Flatness: top gap < 0.76mm\n2. Mullion Heat: unplug condenser fan, run compressor 15min, must be evenly warm\n3. Door Gaps C to D: Top/Mid/Bot = 18mm ±1mm\n4. Liner Gap: > 2 quarters thick → Non-repairable\n5. Lower Deck: bow < 1.5mm\n6. Gasket: heat and reshape if gapping' },
+    { title:'Water Damage - Official Policy', content:'Water Damage - Official Policy\n- Functional? → Cosmetic Warranty SOP\n- Non-functional + water? → Proceed\n\nRepairable: Document, recommend repair, code Level 1 - Damage\nNon-Repairable: Refer to Non-Repairable SOP' },
+    { title:'Cosmetic Damage - Official Policy', content:'Cosmetic Damage - Official Policy\nCoverage: First 30 days from delivery/installation only\nCosmetic = appearance only, not function\nNote: Discoloration/rust/oxidation covered under standard warranty' },
+    { title:'Missing/Damaged Model Tag', content:'Missing/Damaged Model Tag\nDamaged: Enough info? Warn parts may be wrong. Else treat as missing.\nMissing: STOP — cannot diagnose. Refer to CX: 800-253-1301' },
+    { title:'Safety Call Protocol', content:'Safety Call Protocol\nCRITICAL: Logged as Safety call.\nRequired: Must contact Safety Team BEFORE any repairs.' },
+    { title:'LPIM - Diagnostic Tests', content:'LPIM Diagnostic Tests\nFC Temp: ___°F\nTest 15 - Ice Level | Test 36 - Ice Box Fan\nTest 37 - Ice Box Thermistor | Test 56 - IM Error Codes\nTest 57 - Harvest | Test 45 - IM Water Fill\nTest 19 - Fill Tube Heater' },
+    { title:'Infestation - Official Policy', content:'Infestation - Official Policy\nNot covered by Whirlpool.\nCustomer must: hire exterminator, obtain certificate, then contact CX.' },
+    { title:'LR/PR Checklist', content:'LR/PR Checklist\nElectrical:\n- Incoming Voltage and Polarity: _____\n- Arc Fault / GFCI? (Y/N): _____\n- Dedicated Circuit Y/N: _____\n\nDiagnostics:\n- Error Codes: _____\n- Parts Replaced: _____\n\nDocs:\n- Tech Company Account #: _____\n- Photo/Video Requested Y/N: _____' },
+    { title:'Wash Sense Checks', content:'Wash Sense Checks\nJ6-2/6 Shifter: _____\nJ6-3/6 Drain: _____\nJ6-1/6 CCW: _____\nJ6-4/6 CW: _____\nJ4-1/2 Lid Lock: _____' },
+    { title:'Unit Working As Designed', content:'Unit Working As Designed\nConcern(s): _____\nKM Tool checked? Y/N\nTech able to replicate? Y/N' },
+    { title:'Not Recreated', content:'Consumer to video failure and call CX. No parts until issue confirmed.' },
+    { title:'Test Before Install', content:'Tech may bring [part #]. Test first - install only if confirmed failed.' },
+    { title:'Remote Consult', content:'Recommend [part #]. Must test on-site before installing. Call TL if unclear.' },
+    { title:'Test-Confirmed', content:'Replace [part #] after [test] confirms failure. Call TL if normal.' },
+    { title:'Intermittent', content:'Consumer to video/document next occurrence. Call CX before return visit.' },
+];
+
+// ════════════════════════════════════════════════════════════
+// § 1  CONFIG
+// ════════════════════════════════════════════════════════════
+
+const CFG = {
+    VERSION:         'v10.1',
+    TEMPERATURE:     0.2
+};
+
+const LS = {
+    LOGS:           'tts_logs',
+    CATALOG:        'tts_catalog',
+    BRAIN:          'tts_brain',
+    SHORTCUTS:      'tts_shortcuts',
+    ABBREV:         'tts_abbrev',
+    FILLS:          'tts_quick_fills',
+    LEARNING:       'tts_learning_examples',
+    AHT:            'tts_aht_settings',
+    SHEETS:         'tts_sheets_webhook',
+    THEME:          'tts_theme',
+    REPEAT_COUNT:   'tts_repeat_count',
+    REPEAT_DAYS:    'tts_repeat_days',
+    DAILY_CALLS:    'tts_daily_calls',
+    TECHSHEET:      'tts_techsheet',
+    BACKUPS:        'tts_auto_backups',
+    SAVE_COUNT:     'tts_save_count',
+    USAGE:          'tts_shortcut_usage',
+    // Case Library
+    TAGS:           'tts_tags',
+    CALL_LOG:       'tts_call_log',
+    // Tech Sheet Digester
+    PIN_TESTS:      'tts_pin_tests',
+    ERROR_CODES:    'tts_error_codes',
+    // Google Sheets
+    SHEETS_QUEUE:   'tts_sheets_queue',
+    SHEETS_MAPPING: 'tts_sheets_mapping',
+    SHEETS_LOG:     'tts_sheets_log',
+    // Smart Notes
+    NOTE_SESSIONS:  'tts_note_sessions',
+    SECTION_HISTORY:'tts_section_history',
+};
+
+// ════════════════════════════════════════════════════════════
+// § 2  STATE — all mutable state declared here
+// ════════════════════════════════════════════════════════════
+
+function lsGet(key, def = null) {
+    try {
+        const v = localStorage.getItem(key);
+        return v ? JSON.parse(v) : def;
+    } catch { return def; }
+}
+
+function lsSet(key, value) {
+    try {
+        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            if (savedLogs.length > 10) {
+                savedLogs = savedLogs.slice(0, Math.floor(savedLogs.length / 2));
+                toast('⚠️ Storage full — old logs pruned');
+                try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+            }
+        }
+    }
+}
+
+function lsDel(key) {
+    localStorage.removeItem(key);
+}
+
+// Data state
+let savedLogs      = lsGet(LS.LOGS,     []);
+let catalogData    = lsGet(LS.CATALOG,  []);
+let brainData      = lsGet(LS.BRAIN,    []);
+let shortcutList   = lsGet(LS.SHORTCUTS, null) || JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
+let abbrevList     = {};
+let quickFills     = {};
+let learningExamples = lsGet(LS.LEARNING, []);
+let usageCount     = lsGet(LS.USAGE,   {});
+let ahtSettings    = lsGet(LS.AHT,     { warnMin:5, alertMin:8 });
+
+// UI state
+let lastOutput     = null;
+let attachedImages = [];   
+let activeFilter   = 'all';
+let activeSort     = 'recent';
+let _casesCache    = null;
+
+// Timer state
+let callStart = 0, acwStart = 0, callPausedMs = 0;
+let timerIntervals = new Map();
+let swStart = 0, swInterval = null, swElapsed = 0;
+
+// Audio state
+let audioMode      = 'mic';
+let isRecording    = false;
+let micRecognition = null;
+let micActive      = false;
+let sysStream      = null;
+let sysRecorder    = null;
+let sysActive      = false;
+
+// Sheets
+let sheetsUrl      = localStorage.getItem(LS.SHEETS) || '';
+let sheetsQueue    = lsGet(LS.SHEETS_QUEUE, []);
+let activeTagFilters = new Set();
+let libDisplayCount  = 20;
+let lastSections = {};  
+
+// ════════════════════════════════════════════════════════════
+// § 3  STORAGE
+// ════════════════════════════════════════════════════════════
+
+function saveState() {
+    _casesCache = null;
+    lsSet(LS.LOGS,      savedLogs.slice(0, 100));
+    lsSet(LS.CATALOG,   catalogData);
+    lsSet(LS.BRAIN,     brainData);
+    lsSet(LS.SHORTCUTS, shortcutList);
+    lsSet(LS.USAGE,     usageCount);
+    lsSet(LS.LEARNING,  learningExamples.slice(0, 50));
+    const sc = (parseInt(localStorage.getItem(LS.SAVE_COUNT) || '0')) + 1;
+    lsSet(LS.SAVE_COUNT, sc);
+    if (sc % 10 === 0) createAutoBackup();
+}
+
+function createAutoBackup() {
+    const backup = { timestamp: Date.now(), shortcuts: shortcutList, catalog: catalogData, brain: brainData, logs: savedLogs };
+    const backups = lsGet(LS.BACKUPS, []);
+    backups.unshift(backup);
+    if (backups.length > 5) backups.pop();
+    lsSet(LS.BACKUPS, backups);
+}
+
+// ════════════════════════════════════════════════════════════
+// § 4  ENVIRONMENT DETECTION + API ROUTING (Canvas API)
+// ════════════════════════════════════════════════════════════
+
+const ENV = 'canvas';
+
+function getCurrentEnvironment() {
+    updateEnvDisplay();
+    return Promise.resolve(ENV);
+}
+
+async function callAI(system, user) {
+    const apiKey = "";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+    let parts = [];
+    if (typeof user === 'string') {
+        parts = [{ text: user }];
+    } else if (user._multimodal) {
+        parts = user.gemini;
+    } else if (Array.isArray(user)) {
+        parts = user;
+    }
+
+    const body = {
+        contents: [{ role: 'user', parts: parts }],
+        generationConfig: { temperature: CFG.TEMPERATURE, maxOutputTokens: 2000 }
+    };
+    if (system) {
+         body.systemInstruction = { parts: [{ text: system }] };
+    }
+
+    let delay = 1000;
+    for (let i = 0; i < 5; i++) {
+        try {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!res.ok) {
+                if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+                    const errData = await res.text();
+                    throw new Error(`API Error ${res.status}: ${errData}`);
+                }
+                throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+            throw new Error('Invalid Gemini Canvas response structure');
+        } catch (err) {
+            if (i === 4 || err.message.includes('API Error 400') || err.message.includes('API Error 403')) throw err;
+            await new Promise(r => setTimeout(r, delay));
+            delay *= 2;
+        }
+    }
+}
+
+async function transcribeAudio(base64Audio, mimeType = 'audio/webm') {
+    const apiKey = "";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+    const body = {
+        contents: [{ role: 'user', parts: [
+            { inlineData: { mimeType: mimeType, data: base64Audio } },
+            { text: 'Transcribe this audio verbatim. Output ONLY the spoken words. If no clear speech, output nothing.' },
+        ]}],
+        generationConfig: { temperature: 0 }
+    };
+
+    let delay = 1000;
+    for(let i = 0; i < 5; i++){
+        try {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if(!res.ok) throw new Error(`Audio API HTTP ${res.status}`);
+            const data = await res.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } catch(e) {
+            if (i === 4) throw e;
+            await new Promise(r => setTimeout(r, delay));
+            delay *= 2;
+        }
+    }
+}
+
+async function testConnection() {
+    const envEl = document.getElementById('envDetail');
+    if (envEl) envEl.innerHTML = '⏳ Testing Canvas API…';
+    toast('Testing Canvas API connection…');
+    const t0 = Date.now();
+    try {
+        const r  = await callAI('Reply with exactly the word: OK', 'ping');
+        const ms = Date.now() - t0;
+        if (envEl) {
+            envEl.innerHTML = `✅ <strong>CANVAS API WORKING</strong> (${ms}ms)<br>
+                <small>ENV: ${ENV} · Model: gemini-2.5-flash-preview-09-2025</small><br>
+                <small style="color:var(--forest-hi)">Response: "${(r || '').slice(0, 60)}"</small>`;
+            envEl.style.color = 'var(--success)';
+        }
+        toast(`API working — ${ms}ms`);
+    } catch (e) {
+        const ms = Date.now() - t0;
+        if (envEl) {
+            envEl.innerHTML = `❌ <strong>API FAILED</strong> (${ms}ms)<br>
+                <small>ENV: ${ENV}</small><br>
+                <small style="color:var(--rose-hi)">${(e.message || '').slice(0, 150)}</small>`;
+            envEl.style.color = 'var(--danger)';
+        }
+        toast('API failed — try again');
+    }
+}
+
+function updateEnvDisplay() {
+    const badge  = document.getElementById('envBadge');
+    const detail = document.getElementById('envDetail');
+    if (badge) {
+        badge.textContent = 'Canvas API';
+        badge.className   = 'env-badge env-claude';
+        badge.title       = 'Canvas API Integration';
+    }
+    if (detail) {
+        detail.innerHTML   = `✅ Local Canvas API — environment injected API key active.`;
+        detail.style.color = 'var(--success)';
+    }
+}
+
+function retryEnvDetection() {
+    toast('Re-running environment check…');
+    getCurrentEnvironment();
+}
+
+// ════════════════════════════════════════════════════════════
+// § 5  PROMPT — Whirlpool Case Documentation v2.4 Consolidated
+// ════════════════════════════════════════════════════════════
+
+const SECTION_PATTERNS = {
+    complaint:      /^Complaint:[\s\n]+([\s\S]*?)(?=^Prior Repairs:|^Why Parts|^Before call:|^During call:|^Interpretation:|^Resolution:|^Case:|$)/m,
+    prior_work:     /^Prior Repairs:[\s\n]+([\s\S]*?)(?=^Why Parts|^Before call:|^During call:|^Interpretation:|^Resolution:|^Case:|$)/m,
+    diag_reason:    /^Why Parts Were Replaced:[\s\n]+([\s\S]*?)(?=^Before call:|^During call:|^Interpretation:|^Resolution:|^Case:|$)/m,
+    before_call:    /^Before call:[\s\n]+([\s\S]*?)(?=^During call:|^Interpretation:|^Resolution:|^Case:|$)/m,
+    during_call:    /^During call:[\s\n]+([\s\S]*?)(?=^Interpretation:|^Resolution:|^Case:|$)/m,
+    interpretation: /^Interpretation:[\s\n]+([\s\S]*?)(?=^Resolution:|^Case:|$)/m,
+    resolution:     /^Resolution:[\s\n]+([\s\S]*?)(?=^Case:|$)/m,
+};
+
+function migrateTagSchema(item) {
+    if (!item) return item;
+    if (!Array.isArray(item.tags))    item.tags     = [];
+    if (item.archived === undefined)   item.archived = false;
+    if (item.rating   === undefined)   item.rating   = 0;
+    return item;
+}
+
+function migrateLearnSchema() {
+    if (!learningExamples.length || learningExamples[0].id) return;
+    createAutoBackup();
+    learningExamples = learningExamples.map(ex => ({
+        id: crypto.randomUUID(),
+        original: ex.original || '',
+        edited: ex.edited || '',
+        applianceType: '',
+        timestamp: ex.timestamp || Date.now(),
+        rating: 3,
+        charCount: (ex.edited || '').length,
+        diff: null
+    }));
+    saveState();
+}
+
+function pruneExamples() {
+    const before = learningExamples.length;
+    learningExamples = learningExamples.filter(ex => decayWeight(ex) >= 0.05);
+    if (learningExamples.length < before) {
+        saveState();
+    }
+}
+
+function migrateAllTagSchemas() {
+    if (catalogData.length && catalogData[0].archived !== undefined) return;
+    if (!catalogData.length && !brainData.length && !savedLogs.length) return;
+    createAutoBackup();
+    catalogData.forEach(migrateTagSchema);
+    brainData.forEach(migrateTagSchema);
+    savedLogs.forEach(l => { if (l.structured) migrateTagSchema(l.structured); });
+    saveState();
+    rebuildTagRegistry();
+}
+
+function rebuildTagRegistry() {
+    const all = new Set();
+    const addTags = (arr) => arr.forEach(item => (item.tags || []).forEach(t => all.add(t.toLowerCase())));
+    addTags(catalogData);
+    addTags(brainData);
+    savedLogs.forEach(l => (l.structured?.tags || []).forEach(t => all.add(t.toLowerCase())));
+    lsSet(LS.TAGS, [...all]);
+    return all;
+}
+
+function getAllTags() {
+    return lsGet(LS.TAGS, []);
+}
+
+const OUTPUT_FORMAT = `Model: [Model Number] | Case Reason: [Approved Term]
+Complaint:
+- [What the unit is doing — customer's words]
+
+Prior Repairs:
+- [Part replaced — part #, what it addressed. If none, put "- N/A."]
+
+Why Parts Were Replaced:
+- [What the tech found or saw that led to those parts. If none, put "- N/A."]
+
+Before call:
+- [Document every specific symptom, visual observation, and data point provided in the initial tech notes/complaint.]
+- [One detail per bullet.]
+
+During call:
+- [Document all tests performed, specific component logic/theory discussed, and pin-to-pin findings.]
+- [Include whether components passed or failed based on agent's criteria.]
+
+Interpretation:
+- [Explain the failure based on data logic — e.g., "The UI board is dropping the signal return from the paddle." One or two lines max.]
+
+Resolution:
+- [What got decided on the call]
+- [Exact next step — part number, test, or action]
+
+Case: [8-digit number, or N/A]`;
+
+function buildSystemPrompt() {
+    return `Role: You are a Senior Appliance Technical Support Engineer. Generate case documentation using exactly the following structure. Use plain text only. NO Markdown.
+
+STRICT COMPLETION RULES:
+1. MANDATORY HEADERS: You MUST include every section header shown in the OUTPUT FORMAT template below. 
+2. DO NOT TRUNCATE: Generate the entire report from Model down to Case number.
+3. DATA INTEGRITY: Never use "N/A" if transcript contains descriptive symptoms (humming, pulsing lights, intermittently cutting out). Move these to "Before call."
+4. TECHNICAL LOGIC: Document specific communication paths or "Theory of Operation" explained by the agent.
+5. CONNECTOR NAMING: Use exact pin formats (e.g., "J6-1 to J6-3").
+6. BULLETING: Every reading/observation gets its own hyphenated bullet (-). No stacking.
+7. SPEC COMPARISON: Strictly required for values (e.g., "28 ohms / spec: 15–25 ohms — Fail"). If unknown, put "spec: not provided."
+8. FALLBACK: If a section is truly empty, output "- N/A".
+
+No AI preamble. No Markdown formatting. No bold. No headers.`;
+}
+
+function buildUserInput({ model, concern, diag, parts, res, transcript, historyImport = '', pinContext = '', notWithUnit = false, hasImages = false }) {
+    const dataLines = [
+        model ? `Model number: ${model}` : '',
+        notWithUnit ? `CONTEXT: Tech is NOT with the unit.` : '',
+        hasImages ? `MULTIMEDIA: ${attachedImages.length} images attached.` : '',
+        historyImport ? `HISTORY:\n${historyImport}` : '',
+        concern ? `COMPLAINT:\n${concern}` : '',
+        diag ? `TESTS/FINDINGS:\n${diag}` : '',
+        parts ? `PRIOR WORK:\n${parts}` : '',
+        res ? `DECISION/RESOLUTION:\n${res}` : '',
+        transcript ? `TRANSCRIPT:\n${transcript}` : '',
+        pinContext ? `PIN SPECS:\n${pinContext}` : '',
+    ].filter(Boolean).join('\n');
+
+    return `INSTRUCTIONS: Extract all data into the following template. Include all headers.
+
+${dataLines}
+
+---
+
+OUTPUT TEMPLATE:
+${OUTPUT_FORMAT}`;
+}
+
+function buildUserContent(userText) {
+    if (!attachedImages.length) return userText;
+    const geminiParts = [
+        ...attachedImages.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.base64 } })),
+        { text: userText }
+    ];
+    return { _multimodal: true, gemini: geminiParts };
+}
+
+function handleNotWithUnit(checkbox) {
+    const diagBox = $('sec-diag');
+    if (!diagBox) return;
+    const tag = 'Tech not present with unit — remote/phone diagnosis only.';
+    if (checkbox.checked) {
+        if (!diagBox.value.includes(tag)) {
+            diagBox.value = tag + (diagBox.value ? '\n' + diagBox.value : '');
+            updatePreviewCounts();
+        }
+    } else {
+        diagBox.value = diagBox.value.replace(tag + '\n', '').replace(tag, '').trim();
+        updatePreviewCounts();
+    }
+}
+
+function detectApplianceType(model) {
+    if (!model) return '';
+    const m = model.toUpperCase().trim();
+    if (/^(WTW|MVW|CAW|NTW|WFW|MFW|GFW|CFW|HFW|WOW)/.test(m)) return 'Front/Top Load Washer';
+    if (/^(WED|MED|GEW|CED|NED|WGD|MGD|GGD|CGD|NGD)/.test(m)) return 'Dryer';
+    if (/^(W[RQ]F|WRS|WRB|WRX|MFI|MFI|MFI|WRT|WRC|MRT|MSF|MSS|MSC|GSF|GSC|GSS|GS[FCS])/.test(m)) return 'Refrigerator';
+    if (/^(WFE|WFG|WEE|WEG|MFE|MFG|MEE|MEG|GFE|GFG|WOS|WOC|MOS|MOC)/.test(m)) return 'Range/Oven';
+    if (/^(WDF|MDB|WDT|WDTA|GU[0-9]|GUD)/.test(m)) return 'Dishwasher';
+    if (/^(WMH|MMV|GMH|IMH|UMV|YMH)/.test(m)) return 'Microwave';
+    if (/^(WZF|MZF)/.test(m)) return 'Freezer';
+    return '';
+}
+
+function compressTranscript(text) {
+    if (!text) return text;
+    const words = text.trim().split(/\s+/).length;
+    if (words < 200) return text;
+    return text
+        .replace(/\b(?:uh+|um+|umm+|uhh+)\b[,]?\s*/gi, ' ')
+        .replace(/\byou know\b[,]?\s*/gi, ' ')
+        .trim();
+}
+
+// ════════════════════════════════════════════════════════════
+// § 6  NOTE GENERATION
+// ════════════════════════════════════════════════════════════
+
+async function runNoteAnalysis() {
+    const inputs = gatherNoteInputs();
+    if (!inputs.hasContent) { toast('⚠️ Fill in at least one section first'); return; }
+    const btn = $('btnGenerate');
+    const out = $('finalOutput');
+    setBusy(btn, '⏳ Generating…');
+    if (out) out.value = '⏳ Calling AI…';
+    try {
+        const system = buildSystemPrompt();
+        const userText = buildUserInput({ ...inputs, transcript: compressTranscript(inputs.transcript) });
+        const user = buildUserContent(userText);
+        const output = await callAI(system, user);
+        handleGeneratedOutput(output, inputs.model, out);
+        toast('✓ Notes generated!');
+    } catch (e) {
+        if (out) out.value = `❌ AI GENERATION FAILED\n\n${e.message}`;
+        toast('❌ AI Error');
+        console.error('[TTS] runNoteAnalysis error:', e);
+    } finally {
+        setReady(btn, '✨ Generate Final Smart Notes');
+    }
+}
+
+async function streamNoteAnalysis() {
+    const btn = $('btnStream');
+    const genBtn = $('btnGenerate');
+    const out = $('finalOutput');
+    setBusy(btn, '⏳ Standard Generation…');
+    if (genBtn) genBtn.disabled = true;
+    if (out) out.value = '⚡ Streaming not supported — using standard generation…\n';
+    try {
+        await runNoteAnalysis();
+    } catch (e) {
+        toast('❌ Generation error');
+    } finally {
+        setReady(btn, '⚡ Quick Stream (see output as it builds)');
+        if (genBtn) genBtn.disabled = false;
+    }
+}
+
+async function getLiveDirection() {
+    const btn = $('btnDirection');
+    const out = $('directionOut');
+    const model = $('inputModel')?.value.trim() || '';
+    const concern = $('sec-concern')?.value.trim() || '';
+    const diag = $('sec-diag')?.value.trim() || '';
+    const voice = $('transcript')?.value.trim() || '';
+    if (!concern && !diag && !voice) { toast('⚠️ Add content first'); return; }
+    setBusy(btn, '…');
+    if (out) out.value = '🔍 Analyzing…';
+    const content = [
+        model ? `Model: ${model}` : '',
+        concern ? `Complaint: ${concern}` : '',
+        diag ? `Tests: ${diag}` : '',
+        voice ? `Transcript: ${voice.slice(0, 400)}` : '',
+    ].filter(Boolean).join('\n');
+    const system = 'You are a senior tech support engineer. Give EXACTLY 2-3 sentences: most likely root cause + theory of operation + single next diagnostic step.';
+    try {
+        const r = await callAI(system, content);
+        if (out) out.value = r.trim();
+    } catch (e) {
+        if (out) out.value = `❌ ${e.message.slice(0, 200)}`;
+    } finally {
+        setReady(btn, 'Analyze & Get Direction');
+    }
+}
+
+function validateOutput(text) {
+    const required = [
+        'Complaint:',
+        'During call:',
+        'Interpretation:',
+        'Resolution:',
+    ];
+    return required.filter(h => !text.includes(h));
+}
+
+function parseOutputSections(text) {
+    const sections = {};
+    for (const [key, pattern] of Object.entries(SECTION_PATTERNS)) {
+        const m = text.match(pattern);
+        sections[key] = { content: m ? m[1].trim() : '', parseable: !!m };
+    }
+    return sections;
+}
+
+function handleGeneratedOutput(raw, model, outEl) {
+    const output = raw || '';
+    const missing = validateOutput(output);
+    const model_ = model || ($('inputModel')?.value || 'No model');
+    const stamp = `\n\n— Generated: ${model_} | ${new Date().toLocaleTimeString()} | ${ENV} | ${CFG.VERSION}`;
+    const withStamp = output + stamp;
+    if (missing.length > 0) {
+        if (outEl) outEl.value = `⚠️ Truncated — missing: ${missing.join(', ')}\n\n` + withStamp;
+    } else {
+        if (outEl) outEl.value = withStamp;
+    }
+    lastOutput = output;  
+    lastSections = parseOutputSections(output);
+    updateRegenBar();
+    const learnBtn = $('btnLearn');
+    if (learnBtn) learnBtn.style.display = 'block';
+    const structured = extractStructured(output);
+    savedLogs.unshift({ timestamp: Date.now(), output, structured });
+    saveState();
+    renderLibrary();
+    updateStructuredCount();
+    if (model && isRepeatUnit(model)) toast(`🔁 REPEAT UNIT: ${model}`);
+    pushToSheetsWithRetry(buildSheetsPayload());
+}
+
+async function handleImageFiles(fileList) {
+    if (!fileList?.length) return;
+    const toProcess = Array.from(fileList).slice(0, 5 - attachedImages.length);
+    for (const file of toProcess) {
+        if (!file.type.startsWith('image/')) continue;
+        const base64 = await blobToBase64(file);
+        attachedImages.push({ base64, mimeType: file.type, name: file.name });
+    }
+    renderImagePreviews();
+}
+
+function renderImagePreviews() {
+    const container = $('imgPreviews');
+    const countEl   = $('imgCount');
+    if (!container) return;
+    if (countEl) countEl.textContent = attachedImages.length ? `${attachedImages.length} attached` : '';
+    container.innerHTML = '';
+    attachedImages.forEach((img, i) => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;display:inline-block';
+        const thumb = document.createElement('img');
+        thumb.src = `data:${img.mimeType};base64,${img.base64}`;
+        thumb.style.cssText = 'width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border2);';
+        const del = document.createElement('button');
+        del.textContent = '✕';
+        del.style.cssText = 'position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--rose);color:#fff;font-size:.55rem;border:none;cursor:pointer;';
+        del.onclick = () => { attachedImages.splice(i, 1); renderImagePreviews(); };
+        wrap.appendChild(thumb); wrap.appendChild(del);
+        container.appendChild(wrap);
+    });
+}
+
+function initImageDrop() {
+    const zone = $('imgDropZone');
+    if(!zone) return;
+    zone.onclick = () => $('imgFileInput').click();
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.borderColor = 'var(--cobalt-hi)'; });
+    zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.style.borderColor = ''; handleImageFiles(e.dataTransfer.files); });
+}
+
+function gatherNoteInputs() {
+    const model = $('inputModel')?.value.trim() || '';
+    const concern = $('sec-concern')?.value.trim() || '';
+    const diag = $('sec-diag')?.value.trim() || '';
+    const parts = $('sec-parts')?.value.trim() || '';
+    const res = $('sec-res')?.value.trim() || '';
+    const transcript = $('transcript')?.value.trim() || '';
+    const historyImport = $('sec-history-import')?.value.trim() || '';
+    const hasContent = !!(model || concern || diag || parts || res || transcript || historyImport);
+    return { model, concern, diag, parts, res, transcript, historyImport, hasContent };
+}
+
+function buildPinContext() { return ''; }
+
+// ════════════════════════════════════════════════════════════
+// § 7  AUDIO
+// ════════════════════════════════════════════════════════════
+
+function setAudioMode(mode) {
+    audioMode = mode;
+    $('btnModeMic')?.classList.toggle('active', mode === 'mic');
+    $('btnModeDual')?.classList.toggle('active', mode === 'dual');
+    const di = $('dualInfo'); if(di) di.style.display = mode === 'dual' ? 'block' : 'none';
+}
+
+function saveAudioKey() { toast('✅ Managed by Canvas automatically'); }
+function updateAudioKeyStatus() { if($('audioKeyStatus')) $('audioKeyStatus').textContent = '✅ Canvas API ready'; }
+
+async function startVoice() {
+    if (window.location.protocol === 'file:') { toast('❌ file:// blocks mic'); return; }
+    isRecording = true;
+    const btn = $('btnRecord');
+    if(btn) { btn.textContent = 'Stop'; btn.classList.add('btn-record'); }
+    const cb = $('channelBar'); if(cb) cb.style.display = 'flex';
+    const ib = $('interimBar'); if(ib) ib.style.display = 'block';
+    resetTimer('call'); stopTimer('acw');
+    await startMic(audioMode === 'dual');
+    if (audioMode === 'dual') await startSysAudio();
+}
+
+function stopVoice() {
+    isRecording = false;
+    stopMic(); if (sysActive) stopSysAudio();
+    const btn = $('btnRecord');
+    if(btn) { btn.textContent = 'Start'; btn.classList.remove('btn-record'); }
+    const cb = $('channelBar'); if(cb) cb.style.display = 'none';
+    stopTimer('call'); resetTimer('acw');
+}
+
+async function startMic(useLabel) {
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Speech) return;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+    } catch (err) {
+        isRecording = false; stopVoice(); toast('❌ Mic denied'); return;
+    }
+    micRecognition = new Speech();
+    micRecognition.continuous = true; micRecognition.interimResults = true;
+    micRecognition.onresult = (ev) => {
+        if (!isRecording) return;
+        let interim = '', final = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
+            else interim += ev.results[i][0].transcript;
+        }
+        const ib = $('interimBar'); if(ib) ib.textContent = interim ? `🎙️ ${interim}` : '…';
+        if (final) appendTranscript(final, useLabel ? 'TECH' : null);
+    };
+    micRecognition.onstart = () => { micActive = true; const dt = $('dotTech'); if(dt) dt.classList.add('on'); };
+    micRecognition.onend = () => { 
+        if (isRecording && micActive) {
+            try { micRecognition.start(); } catch {}
+        } else { 
+            micActive = false; 
+            const dt = $('dotTech'); if(dt) dt.classList.remove('on'); 
+        } 
+    };
+    micRecognition.start();
+}
+
+function stopMic() { 
+    micActive = false; 
+    if (micRecognition) {
+        micRecognition.onend = null; 
+        micRecognition.onresult = null;
+        try { micRecognition.stop(); micRecognition.abort(); } catch {}
+        micRecognition = null;
+    }
+}
+
+async function startSysAudio() {
+    try {
+        const ds = await navigator.mediaDevices.getDisplayMedia({ video: { width: 1 }, audio: true });
+        ds.getVideoTracks().forEach(t => t.stop());
+        const at = ds.getAudioTracks(); if (!at.length) return false;
+        sysStream = new MediaStream(at);
+        sysRecorder = new MediaRecorder(sysStream, { mimeType: 'audio/webm;codecs=opus' });
+        sysRecorder.ondataavailable = async (e) => {
+            if (e.data.size < 500) return;
+            setCxStatus('transcribing…');
+            try {
+                const b64 = await blobToBase64(e.data);
+                const text = await transcribeAudio(b64);
+                if (text?.trim()) appendTranscript(text.trim(), 'CX');
+            } catch {} finally { setCxStatus(''); }
+        };
+        sysRecorder.start(6000); sysActive = true;
+        const dc = $('dotCx'); if(dc) { dc.style.background = 'var(--cx)'; dc.classList.add('on'); }
+        at[0].onended = () => stopSysAudio();
+        return true;
+    } catch { return false; }
+}
+
+function stopSysAudio() {
+    sysActive = false; if (sysRecorder && sysRecorder.state !== 'inactive') sysRecorder.stop();
+    if (sysStream) { sysStream.getTracks().forEach(t => t.stop()); sysStream = null; }
+    const dc = $('dotCx'); if(dc) { dc.style.background = '#555'; dc.classList.remove('on'); }
+}
+
+function appendTranscript(text, label) {
+    const box = $('transcript');
+    if(!box) return;
+    const prefix = label ? `[${label}] ` : '';
+    box.value += (box.value ? '\n' : '') + prefix + symbolize(text.trim());
+    box.scrollTop = box.scrollHeight;
+    updatePreviewCounts();
+}
+
+function setCxStatus(msg) { const el = $('cxStatus'); if(el) el.textContent = msg; }
+
+// ════════════════════════════════════════════════════════════
+// REGEN BAR
+// ════════════════════════════════════════════════════════════
+
+const REGEN_SECTIONS = [
+    { key: 'complaint',     label: 'Complaint' },
+    { key: 'during_call',   label: 'Checks' },
+    { key: 'interpretation',label: 'Interpretation' },
+    { key: 'resolution',    label: 'Resolution' },
+];
+
+const REGEN_PROMPTS = {
+    complaint: 'Rewrite ONLY the "Complaint:" section as simple plain text bullets.',
+    during_call: 'Rewrite ONLY the "During call:" section including specific logic/theory as simple bullets.',
+    interpretation: 'Rewrite ONLY the "Interpretation:" section. Root cause logic only, max 2 lines.',
+    resolution: 'Rewrite ONLY the "Resolution:" section with decided action and next step.',
+};
+
+function updateRegenBar() {
+    const bar = $('regenBar'); if(!bar) return;
+    const hasOutput = Object.values(lastSections).some(s => s.parseable);
+    bar.style.display = hasOutput ? 'flex' : 'none';
+}
+
+async function regenerateSection(sectionKey) {
+    if (!lastSections[sectionKey]?.parseable) return;
+    const inputs = gatherNoteInputs();
+    const current = ($('finalOutput')?.value || '').replace(/\n\n— Generated:.*$/m, '').trim();
+    const btn = document.querySelector(`[data-regen="${sectionKey}"]`);
+    if(!btn) return;
+    setBusy(btn, '…');
+    const system = buildSystemPrompt() + '\n\nOutput ONLY the plain text bullets for the requested section. No headers.';
+    const user = buildUserInput({ ...inputs, transcript: compressTranscript(inputs.transcript) }) + `\n\nTASK: ${REGEN_PROMPTS[sectionKey]}`;
+    try {
+        const cleaned = (await callAI(system, user)).trim();
+        const pattern = SECTION_PATTERNS[sectionKey];
+        const m = current.match(pattern);
+        if (m) {
+            const updated = current.substring(0, m.index) + m[0].replace(m[1], '\n' + cleaned + '\n') + current.substring(m.index + m[0].length);
+            const stamp = `\n\n— Generated: ${inputs.model || 'No model'} | ${new Date().toLocaleTimeString()} | ${ENV} | ${CFG.VERSION}`;
+            $('finalOutput').value = updated + stamp;
+            lastSections = parseOutputSections(updated);
+        }
+    } catch {} finally { setReady(btn, '↻ ' + REGEN_SECTIONS.find(s => s.key === sectionKey).label); }
+}
+
+// ════════════════════════════════════════════════════════════
+// § 8  CASE LIBRARY + PARSING
+// ════════════════════════════════════════════════════════════
+
+function extractStructured(output) {
+    if (!output) return null;
+    const mm = output.match(/Model:\s*([A-Z0-9\-]{5,17})/i);
+    const model = mm ? mm[1].trim().toUpperCase() : '';
+    const cSec = output.match(/^Complaint:\s*\n([\s\S]*?)(?=^Prior Repairs:|^Why|^Before|^During|^Interpretation|^Resolution|^Case:|$)/m);
+    const syms = cSec ? (cSec[1].match(/^\s*[-•*]?\s*([^\n]+)/gm) || []).map(b => b.replace(/^\s*[-•*]?\s*/, '').trim()) : [];
+    const dSec = output.match(/^During call:\s*\n([\s\S]*?)(?=^Interpretation:|^Resolution:|^Case:|$)/m);
+    const comps = dSec ? (dSec[1].match(/^\s*[-•*]?\s*([^\n]+)/gm) || []).map(b => ({ name: b.replace(/^\s*[-•*]?\s*/, '').trim(), status: 'unknown' })) : [];
+    const iSec = output.match(/^Interpretation:\s*\n([\s\S]*?)(?=^Resolution:|^Case:|$)/m);
+    const cause = iSec ? iSec[1].trim() : '';
+    return { model, symptomTags: syms, componentsTested: comps, rootCause: cause, outcomeTag: 'unknown' };
+}
+
+function buildSheetsPayload() {
+    const inputs = gatherNoteInputs();
+    const rawOut = ($('finalOutput')?.value || '').replace(/\n\n— Generated:.*$/m, '').trim();
+    const structured = extractStructured(rawOut);
+    const callMs = callStart ? (Date.now() - callStart - callPausedMs) : 0;
+    return {
+        date: new Date().toLocaleString(),
+        model: inputs.model,
+        concern: inputs.concern,
+        fullNote: rawOut,
+        callSec: Math.floor(callMs / 1000),
+        outcomeTag: structured?.outcomeTag || '',
+        env: ENV, ttsVersion: CFG.VERSION,
+    };
+}
+
+async function pushToSheetsWithRetry(payload) {
+    if (!sheetsUrl) return;
+    updateSheetsStatus('pushing', '⏳ Syncing…');
+    try {
+        const res = await fetch(sheetsUrl, { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) updateSheetsStatus('success', `✓ Synced`);
+    } catch { updateSheetsStatus('queued', `⏳ Queued`); }
+}
+
+function getAllCases() {
+    if (_casesCache) return _casesCache;
+    const cases = [];
+    catalogData.forEach((item, i) => cases.push({ id: `cat-${i}`, type: 'catalog', model: extractModel(item.content), title: item.title, content: item.content, timestamp: item.timestamp || Date.now(), preview: item.content.slice(0, 100), tags: item.tags || [], archived: item.archived || false, rating: item.rating || 0 }));
+    brainData.forEach((item, i) => cases.push({ id: `kb-${item.model}`, type: 'knowledge', model: item.model || 'Unknown', title: `${item.model} — KB`, content: item.sym, timestamp: item.timestamp || Date.now(), preview: item.sym.slice(0, 100), tags: item.tags || [], archived: item.archived || false, rating: item.rating || 0 }));
+    savedLogs.slice(0, 20).forEach((item, i) => cases.push({ id: `log-${i}`, type: 'history', model: item.structured?.model || 'Unknown', title: `Log — ${new Date(item.timestamp).toLocaleDateString()}`, content: item.output || '', timestamp: item.timestamp, preview: (item.output || '').slice(0, 100), tags: [], archived: false, rating: 0 }));
+    _casesCache = cases; return cases;
+}
+
+function renderLibrary() {
+    _casesCache = null;
+    const search = $('libSearch')?.value || '';
+    const showArchived = $('showArchivedToggle')?.checked || false;
+    const filtered = filterSort(getAllCases(), activeFilter, activeSort, search, showArchived);
+    const cont = $('caseList'); if (!cont) return;
+    cont.innerHTML = filtered.slice(0, libDisplayCount).map(c => `
+        <div class="case-card type-${c.type}" onclick="viewCase(${JSON.stringify(c).replace(/"/g, '&quot;')})">
+            <div style="display:flex;justify-content:space-between;font-weight:bold;font-family:monospace;color:var(--amber-hi)">${esc(c.model)} <span>${c.type}</span></div>
+            <div style="font-weight:bold;font-size:.82rem">${esc(c.title)}</div>
+            <div style="font-size:.8rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.preview)}…</div>
+        </div>
+    `).join('');
+}
+
+function viewCase(c) {
+    $('previewTitle').textContent = c.title;
+    $('previewBody').textContent = c.content;
+    $('previewInsert').onclick = () => { $('finalOutput').value = c.content; closeModal('previewModal'); };
+    openModal('previewModal');
+}
+
+function filterSort(cases, filter, sort, search, showArchived) {
+    let f = cases.filter(c => showArchived ? true : !c.archived);
+    if (filter !== 'all') f = f.filter(c => c.type === filter);
+    if (search) { const lo = search.toLowerCase(); f = f.filter(c => c.model.toLowerCase().includes(lo) || c.content.toLowerCase().includes(lo)); }
+    if (sort === 'recent') f.sort((a, b) => b.timestamp - a.timestamp);
+    return f;
+}
+
+function extractModel(content) {
+    const m = content.match(/Model:\s*([A-Z0-9\-]{5,17})/i);
+    return m ? m[1].toUpperCase() : 'Unknown';
+}
+
+function isRepeatUnit(model) {
+    const cutoff = Date.now() - 30 * 86400000;
+    return savedLogs.filter(l => l.timestamp > cutoff && (l.structured?.model === model.toUpperCase())).length >= 3;
+}
+
+// ════════════════════════════════════════════════════════════
+// § 10  UI HELPERS
+// ════════════════════════════════════════════════════════════
+
+function handleTimerClick(type) { if (timerIntervals.has(type)) stopTimer(type); else resetTimer(type); }
+function resetTimer(type) { stopTimer(type); const s = Date.now(); if(type==='call') callStart=s; else acwStart=s; timerIntervals.set(type, setInterval(()=>updateTimerDisplay(type), 1000)); }
+function stopTimer(type) { if(timerIntervals.has(type)){ clearInterval(timerIntervals.get(type)); timerIntervals.delete(type); } }
+function updateTimerDisplay(type) {
+    const s = type==='call'?callStart:acwStart; const d = s?Math.floor((Date.now()-s)/1000):0;
+    const el = $(type==='call'?'callTimer':'acwTimer');
+    if(el) el.textContent = `${Math.floor(d/60).toString().padStart(2,'0')}:${(d%60).toString().padStart(2,'0')}`;
+}
+
+function adjustCalls(n) { const c = lsGet('tts_daily_calls', {count:0,date:new Date().toDateString()}); c.count=Math.max(0,c.count+n); lsSet('tts_daily_calls',c); updateCallDisplay(); }
+function resetCallCount() { lsSet('tts_daily_calls',{count:0,date:new Date().toDateString()}); updateCallDisplay(); }
+function updateCallDisplay() { const el = $('callCount'); if(el) el.textContent = lsGet('tts_daily_calls', {count:0}).count; }
+
+function switchTab(t) {
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.tab===t));
+    document.querySelectorAll('.right-view').forEach(v=>v.classList.toggle('active', v.id===t+'View'));
+    if(t==='library') renderLibrary();
+}
+
+function openMobileNav() { $('mobileSidebar').style.left='0'; $('mobileOverlay').style.display='block'; }
+function closeMobileNav() { $('mobileSidebar').style.left='-260px'; $('mobileOverlay').style.display='none'; }
+function mobileTab(t) { switchTab(t); closeMobileNav(); }
+
+function toggleNoteSection(h) { document.querySelectorAll('.note-section-group').forEach(g=>g.classList.remove('active')); h.parentElement.classList.add('active'); }
+
+function openModal(id) { const el = $(id); if(el) el.classList.add('visible'); }
+function closeModal(id) { const el = $(id); if(el) el.classList.remove('visible'); }
+
+function confirm(msg, cb) {
+    const el = $('confirmMsg'); if(el) el.textContent = msg;
+    $('confirmYes').onclick = () => { cb(); closeModal('confirmModal'); };
+    openModal('confirmModal');
+}
+
+function toast(m) {
+    const c = $('toastContainer'); if(!c) return;
+    const t = document.createElement('div');
+    t.style.cssText = 'padding:10px;background:var(--panel);border-left:4px solid var(--cobalt);box-shadow:0 4px 10px rgba(0,0,0,.5);font-size:.8rem;';
+    t.textContent = m; c.appendChild(t); setTimeout(()=>t.remove(), 3000);
+}
+
+function qi(t) {
+    const ta = document.querySelector('.note-section-group.active textarea');
+    if(!ta) return;
+    const s = ta.selectionStart; ta.value = ta.value.slice(0,s) + t + ta.value.slice(ta.selectionEnd);
+    ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus();
+}
+
+function updatePreviewCounts() {
+    ['concern','diag','parts','res','history-import'].forEach(k => {
+        const el = $(`sec-${k}`);
+        if(el) {
+            const n = el.value.split('\n').filter(l=>l.trim()).length;
+            const countEl = $(`cnt-${k}`);
+            if(countEl) countEl.textContent = n || '';
+        }
+    });
+}
+
+function copyOut() {
+    const v = $('finalOutput').value; if(!v) return;
+    const el = document.createElement('textarea'); el.value = v; document.body.appendChild(el);
+    el.select(); document.execCommand('copy'); document.body.removeChild(el); toast('Copied!');
+}
+
+function nextCallPrep() {
+    confirm('Clear for next call?', () => {
+        const im = $('inputModel'); if(im) im.value=''; 
+        ['concern','diag','parts','res','history-import'].forEach(k=>{
+            const el = $(`sec-${k}`);
+            if(el) el.value='';
+        });
+        const tr = $('transcript'); if(transcript) tr.value=''; 
+        const fo = $('finalOutput'); if(fo) fo.value=''; 
+        attachedImages=[]; renderImagePreviews();
+        stopTimer('call'); stopTimer('acw'); adjustCalls(1); updatePreviewCounts(); toast('Cleared');
+    });
+}
+
+function updateStructuredCount() { const el = $('structuredCaseCount'); if(el) el.textContent = savedLogs.length; }
+function updateSheetsStatus(s,m) { const el = $('sheetsStatus'); if(el) el.textContent = m; }
+
+// ════════════════════════════════════════════════════════════
+// § 12  INIT
+// ════════════════════════════════════════════════════════════
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const debounce = (f,m) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>f(...a),m); }; };
+const symbolize = (s) => s.replace(/ohms/gi,'Ω').replace(/volts/gi,'V').replace(/degrees/gi,'°');
+const setBusy = (b,t) => { if(!b) return; b.disabled=true; b.dataset.old=b.innerHTML; b.innerHTML=t; };
+const setReady = (b,t) => { if(!b) return; b.disabled=false; b.innerHTML=t || b.dataset.old; };
+const blobToBase64 = (b) => new Promise((r,j)=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result.split(',')[1]); fr.readAsDataURL(b); });
+
+document.addEventListener('DOMContentLoaded', () => {
+    migrateAllTagSchemas(); migrateLearnSchema(); pruneExamples(); getCurrentEnvironment();
+    updateCallDisplay(); updateStructuredCount(); updateEnvDisplay();
+    initImageDrop(); setInterval(()=>{$('clock').textContent = new Date().toLocaleTimeString();}, 1000);
+    
+    $('btnRecord').onclick = () => isRecording?stopVoice():startVoice();
+    $('btnGenerate').onclick = runNoteAnalysis;
+    $('btnStream').onclick = streamNoteAnalysis;
+    $('btnDirection').onclick = getLiveDirection;
+    $('btnNext').onclick = nextCallPrep;
+    
+    $('btnSave').onclick = () => { 
+        const m = $('inputModel').value || 'Unknown';
+        catalogData.unshift({
+            title: `${m} - ${new Date().toLocaleDateString()}`, 
+            content: $('finalOutput').value, 
+            timestamp: Date.now(),
+            tags: [],
+            archived: false,
+            rating: 0
+        }); 
+        saveState(); 
+        renderLibrary();
+        toast('Saved to library!'); 
+    };
+    
+    document.querySelectorAll('.filter-pill').forEach(p=>p.onclick=()=>{ document.querySelectorAll('.filter-pill').forEach(x=>x.classList.remove('active')); p.classList.add('active'); activeFilter=p.dataset.filter; renderLibrary(); });
+    $('libSearch').oninput = debounce(renderLibrary, 300);
+    
+    const shortcuts = $('scList');
+    shortcutList.forEach((s,i) => {
+        const div = document.createElement('div'); div.className='shortcut-row';
+        div.innerHTML = `<div style="flex:1;overflow:hidden;text-overflow:ellipsis;">${s.title}</div><button class="row-btn" onclick="qi(${JSON.stringify(s.content).replace(/"/g, '&quot;')})">Insert</button>`;
+        shortcuts.appendChild(div);
+    });
+
+    console.log(`✅ TTS LOADED — ENV: ${ENV}`);
+});
+
+function pruneExamples() {
+    const before = learningExamples.length;
+    learningExamples = learningExamples.filter(ex => decayWeight(ex) >= 0.05);
+    if (learningExamples.length < before) {
+        saveState();
+    }
+}
+
+</script>
+<!-- ══ TICKER ══ -->
+<div id="ticker">
+  <div id="ticker-inner">
+    ★ TTS SUITE v10.1 ★ WHIRLPOOL FIELD SERVICE ★ READY ★ THEORY OF OPERATION ENABLED ★ DUAL CHANNEL AUDIO AVAILABLE ★ GOOGLE SHEETS SYNC ACTIVE ★ PRESS START ★
+  </div>
+</div>
+</body>
+</html>
